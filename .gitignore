@@ -1,0 +1,64 @@
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+*.egg-info/
+pip-wheel-metadata/
+.venv/
+venv/
+env/
+
+# Node / Expo / React Native
+node_modules/
+.expo/
+.expo-shared/
+web-build/
+android/
+ios/
+.kotlin/
+expo-env.d.ts
+*.tsbuildinfo
+metro-health-check*
+.metro-health-check*
+
+# Logs and debug output
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local tooling and generated artifacts
+.claude/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
