@@ -41,7 +41,7 @@ if allowed_origins:
         CORSMiddleware,
         allow_origins=allowed_origins,
         allow_credentials=False,
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST"],
         allow_headers=["Content-Type"],
     )
 
