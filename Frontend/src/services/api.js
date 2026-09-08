@@ -13,3 +13,13 @@ export const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL,
   timeout: 10000,
 });
+
+/**
+ * Confirms that the configured backend is reachable.
+ *
+ * @returns {Promise<{ status: string }>}
+ */
+export async function healthCheck() {
+  const response = await api.get("/health");
+  return response.data;
+}

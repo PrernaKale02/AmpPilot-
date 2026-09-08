@@ -1,6 +1,10 @@
 """Request/response schemas for battery health prediction."""
 
+from typing import Annotated
+
 from pydantic import BaseModel, Field
+
+SensorReading = Annotated[list[float], Field(min_length=8, max_length=8)]
 
 
 class ChargingSessionInput(BaseModel):
@@ -10,7 +14,7 @@ class ChargingSessionInput(BaseModel):
     min_cell_voltage, max_temp, min_temp, time_seconds.
     """
 
-    readings: list[list[float]] = Field(
+    readings: list[SensorReading] = Field(
         ...,
         description="128 rows of 8 sensor values each.",
         min_length=128,
