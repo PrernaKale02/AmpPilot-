@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import charging
+from app.api.routes import battery, charging
 from app.core.config import get_settings
 from app.core.exceptions import (
     AmpPilotError,
@@ -46,6 +46,7 @@ if allowed_origins:
     )
 
 app.include_router(charging.router)
+app.include_router(battery.router)
 
 #: Domain error -> (HTTP status, stable code, message safe to show a user).
 #: Ordered most-specific first; `UpstreamTimeout` subclasses `UpstreamError`.
