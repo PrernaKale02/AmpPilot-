@@ -25,3 +25,4 @@ build/
 dist/
 
 app/ml_models/*.pt
+Backend/X.npy

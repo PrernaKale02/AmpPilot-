@@ -1,20 +1,14 @@
-import json, random
+import numpy as np
+import json
 
-def fake_row(i):
-    return [
-        round(random.uniform(3.5, 4.2), 3),
-        round(random.uniform(-40, 0), 2),
-        round(random.uniform(20, 100), 1),
-        round(random.uniform(3.5, 4.2), 3),
-        round(random.uniform(3.5, 4.2), 3),
-        round(random.uniform(15, 35), 1),
-        round(random.uniform(15, 35), 1),
-        i * 5.0
-    ]
+X = np.load("X.npy")   # adjust path if it's not in the current folder
+print("X shape:", X.shape)
 
-payload = {"readings": [fake_row(i) for i in range(128)]}
+sample = X[100]  # pick any index, e.g. session #100
+payload = {"readings": sample.tolist()}
 
-with open("sample_payload.json", "w") as f:
+# save it to a file so you can easily copy-paste
+with open("test_payload.json", "w") as f:
     json.dump(payload, f)
 
-print("Saved to sample_payload.json")
+print(json.dumps(payload)[:300], "...")  # preview
