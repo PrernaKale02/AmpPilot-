@@ -1,9 +1,10 @@
 """Battery health model: loads the trained network once at import time
 and exposes a single predict() function.
 
-IMPORTANT: The normalization constants below are PLACEHOLDERS and will
-give numerically wrong (though not erroring) predictions until replaced
-with the real values printed from the training notebook's Step 3:
+Normalization constants below come from training the multi-task
+BiLSTM+Attention model (final_model_no_mfg) on all 3 EVBattery
+manufacturer datasets combined. If the model is retrained, re-run the
+training notebook's Step 3 and update these values:
     print("SENSOR_MEAN =", mean.tolist())
     print("SENSOR_STD =", std.tolist())
     print("CAPACITY_MEAN =", capacity_mean)
@@ -20,14 +21,21 @@ import torch.nn as nn
 
 _MODEL_PATH = Path(__file__).resolve().parent.parent / "ml_models" / "final_model_no_mfg.pt"
 
-# ==================== PLACEHOLDER — REPLACE AFTER RE-RUNNING TRAINING ====================
-_SENSOR_MEAN = np.array([3.9, -25.0, 68.0, 3.9, 3.85, 20.0, 16.0, 635.0], dtype=np.float32)
-_SENSOR_STD = np.array([0.15, 30.0, 15.0, 0.15, 0.15, 8.0, 7.0, 370.0], dtype=np.float32)
-_CAPACITY_MEAN = 40.0
-_CAPACITY_STD = 5.0
-_SOH_MEAN = 85.0
-_SOH_STD = 10.0
-# ===========================================================================================
+# Normalization constants from the trained model (final_model_no_mfg, all 3 manufacturers).
+_SENSOR_MEAN = np.array(
+    [3.94499135017395, -9.583528518676758, 70.92549896240234, 3.952288866043091,
+     3.902657985687256, 29.018632888793945, 25.83769989013672, 634.0243530273438],
+    dtype=np.float32,
+)
+_SENSOR_STD = np.array(
+    [0.2569948434829712, 7.840857028961182, 25.75346565246582, 0.2583308815956116,
+     0.25116822123527527, 8.011555671691895, 8.574789047241211, 369.41412353515625],
+    dtype=np.float32,
+)
+_CAPACITY_MEAN = 41.01803
+_CAPACITY_STD = 1.9790907
+_SOH_MEAN = 95.37797
+_SOH_STD = 3.4451575
 
 
 class _MultiTaskBiLSTMAttention(nn.Module):
