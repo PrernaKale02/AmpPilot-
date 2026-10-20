@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import PairVehicleScreen from "../features/vehicle/screens/PairVehicleScreen";
+import SimulationScreen from "../features/battery/screens/SimulationScreen";
 import { MainTabNavigator } from "./MainTabNavigator";
 import { Theme } from "../theme/theme";
 
@@ -21,6 +22,7 @@ export function MainNavigator() {
     >
       <Stack.Screen name="PairVehicle" component={PairVehicleScreen} />
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+      <Stack.Screen name="SimulationMode" component={SimulationScreen} />
     </Stack.Navigator>
   );
 }
