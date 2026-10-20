@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { Screen, AppHeader } from "../../../components/layout";
 import { Card } from "../../../components/ui/Card";
 import { Theme } from "../../../theme/theme";
@@ -32,6 +33,7 @@ const METRIC_LABELS = {
  * @returns {React.JSX.Element}
  */
 export default function BatteryScreen() {
+  const navigation = useNavigation();
   const [battery, setBattery] = useState(null);
 
   useEffect(() => {
@@ -81,6 +83,17 @@ export default function BatteryScreen() {
           <Text style={styles.recommendationLabel}>Recommendation</Text>
         </View>
         <Text style={styles.recommendationBody}>{recommendation}</Text>
+      </Card>
+
+      <Card style={styles.simulationCard} onPress={() => navigation.navigate("SimulationMode")}>
+        <View style={styles.simulationIcon}>
+          <Ionicons name="flask-outline" size={20} color={Theme.colors.primary} />
+        </View>
+        <View style={styles.simulationText}>
+          <Text style={styles.simulationTitle}>Simulation Mode</Text>
+          <Text style={styles.simulationSubtitle}>Run a virtual EV session for local testing.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={Theme.colors.textMuted} />
       </Card>
     </Screen>
   );
@@ -141,5 +154,30 @@ const styles = StyleSheet.create({
   recommendationBody: {
     ...Theme.typography.body,
     color: Theme.colors.textPrimary,
+  },
+  simulationCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Theme.spacing.md,
+  },
+  simulationIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: Theme.radius.pill,
+    backgroundColor: Theme.colors.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  simulationText: {
+    flex: 1,
+    gap: 2,
+  },
+  simulationTitle: {
+    ...Theme.typography.h3,
+    color: Theme.colors.textPrimary,
+  },
+  simulationSubtitle: {
+    ...Theme.typography.caption,
+    color: Theme.colors.textSecondary,
   },
 });
