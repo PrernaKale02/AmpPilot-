@@ -1,3 +1,4 @@
+import { View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import DashboardScreen from "../features/dashboard/screens/DashboardScreen";
@@ -5,6 +6,7 @@ import BatteryScreen from "../features/battery/screens/BatteryScreen";
 import { ChargingNavigator } from "./ChargingNavigator";
 import InsightsScreen from "../features/insights/screens/InsightsScreen";
 import ProfileScreen from "../features/profile/screens/ProfileScreen";
+import { AssistantButton } from "../features/assistant/components/AssistantButton";
 import { Theme } from "../theme/theme";
 
 const Tab = createBottomTabNavigator();
@@ -23,12 +25,19 @@ const TAB_ICONS = {
  * Hosts the five top-level sections behind a bottom tab bar. Profile is
  * the complete "You" section — account, vehicle, preferences, support,
  * and app info all live there; there is no separate Settings tab.
+ * The voice-assistant mic floats over every tab via `screenLayout`.
  *
  * @returns {React.JSX.Element}
  */
 export function MainTabNavigator() {
   return (
     <Tab.Navigator
+      screenLayout={({ children, navigation }) => (
+        <View style={{ flex: 1 }}>
+          {children}
+          <AssistantButton navigation={navigation} />
+        </View>
+      )}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: Theme.colors.primary,

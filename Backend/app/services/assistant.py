@@ -3,12 +3,15 @@
 Gemini interprets the question and may *request* a tool; this module runs the
 tool against AmpPilot's own data and returns the result. Gemini never reads
 data or controls anything directly.
+
+If a model is overloaded (503) or rate-limited (429), the whole question is
+retried on the next fallback model, so a busy model never blocks the app.
 """
 
 import logging
 
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 
 from app.api.routes.charging import get_nearby_charging_stations
 from app.core.config import get_settings
@@ -17,6 +20,7 @@ from app.services.simulation import simulation_service
 logger = logging.getLogger(__name__)
 
 MAX_TOOL_ROUNDS = 3
+RETRYABLE_STATUS = {429, 500, 503, 504}
 
 SYSTEM_INSTRUCTION = (
     "You are AmpPilot, the voice assistant in an EV battery app. "
@@ -61,14 +65,28 @@ TOOLS = types.Tool(
 _client: genai.Client | None = None
 
 
+def _http_options() -> types.HttpOptions:
+    """20 s timeout and no library retries: we fail over to another model instead."""
+    try:
+        return types.HttpOptions(timeout=30_000, retry_options=types.HttpRetryOptions(attempts=1))
+    except Exception:  # older SDKs without retry_options
+        return types.HttpOptions(timeout=30_000)
+
+
 def _get_client() -> genai.Client:
     global _client
     if _client is None:
         key = (get_settings().gemini_api_key or "").strip()
         if not key:
             raise RuntimeError("GEMINI_API_KEY is not set in Backend/.env.")
-        _client = genai.Client(api_key=key)
+        _client = genai.Client(api_key=key, http_options=_http_options())
     return _client
+
+
+def _models() -> list[str]:
+    settings = get_settings()
+    fallbacks = [m.strip() for m in settings.gemini_fallback_models.split(",") if m.strip()]
+    return [settings.gemini_model] + [m for m in fallbacks if m != settings.gemini_model]
 
 
 def _battery_status() -> dict:
@@ -97,8 +115,8 @@ async def _nearby_stations(latitude, longitude, radius_km) -> dict:
     return {"radius_km": radius, "count": len(result.stations), "nearest": nearest}
 
 
-async def ask_assistant(message: str, latitude=None, longitude=None) -> tuple[str, str | None]:
-    """Returns (spoken reply, optional app action such as 'show_stations')."""
+async def _run_conversation(model: str, message: str, latitude, longitude) -> tuple[str, str | None]:
+    """One full question → (tool calls) → answer exchange on a single model."""
     client = _get_client()
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION,
@@ -110,7 +128,7 @@ async def ask_assistant(message: str, latitude=None, longitude=None) -> tuple[st
 
     for _ in range(MAX_TOOL_ROUNDS):
         response = await client.aio.models.generate_content(
-            model=get_settings().gemini_model, contents=contents, config=config
+            model=model, contents=contents, config=config
         )
         calls = response.function_calls or []
         if not calls:
@@ -132,3 +150,19 @@ async def ask_assistant(message: str, latitude=None, longitude=None) -> tuple[st
         contents.append(types.Content(role="user", parts=parts))
 
     return "Sorry, that took too many steps. Please try again.", action
+
+
+async def ask_assistant(message: str, latitude=None, longitude=None) -> tuple[str, str | None]:
+    """Returns (spoken reply, optional app action such as 'show_stations')."""
+    last_error: Exception | None = None
+    for model in _models():
+        try:
+            reply, action = await _run_conversation(model, message, latitude, longitude)
+            logger.info("Assistant answered with model %s", model)
+            return reply, action
+        except errors.APIError as exc:
+            if getattr(exc, "code", None) not in RETRYABLE_STATUS:
+                raise
+            logger.warning("Model %s unavailable (%s); trying next model.", model, exc.code)
+            last_error = exc
+    raise RuntimeError("All Gemini models are busy right now.") from last_error
