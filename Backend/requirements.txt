@@ -4,3 +4,4 @@ httpx
 pydantic-settings
 torch 
 numpy
+google-genai
