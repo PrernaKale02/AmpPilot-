@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Screen } from "../../../components/layout";
@@ -138,9 +138,10 @@ export default function StationDetailsScreen() {
     ) : null;
 
   const handleDirectionsPress = () => {
-    // TODO: hand off to the OS maps app via Linking once the map/location
-    // phase lands. Intentionally inert for this UI-only phase.
-    console.log("Get Directions pressed for station:", station.id);
+    // Opens Google Maps directions (new tab on web, Maps app/browser on phones).
+    const { latitude, longitude } = station;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+    Linking.openURL(url).catch((error) => console.warn("Could not open maps:", error));
   };
 
   return (
