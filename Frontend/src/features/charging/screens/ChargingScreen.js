@@ -10,6 +10,7 @@ import { ChargingOverviewCard } from "../components/ChargingOverviewCard";
 import { ChargingSummaryCard } from "../components/ChargingSummaryCard";
 import { ChargingSessionCard } from "../components/ChargingSessionCard";
 import { ChargingRecommendationCard } from "../components/ChargingRecommendationCard";
+import { useSimulationStore } from "../../../store/simulationStore";
 
 /**
  * Charging Overview screen — current charging status, weekly summary,
@@ -22,16 +23,17 @@ import { ChargingRecommendationCard } from "../components/ChargingRecommendation
 export default function ChargingScreen() {
   const navigation = useNavigation();
   const [overview, setOverview] = useState(null);
+  const session = useSimulationStore((state) => state.session);
 
   useEffect(() => {
     let isMounted = true;
-    getChargingOverview().then((data) => {
+    getChargingOverview(session).then((data) => {
       if (isMounted) setOverview(data);
     });
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [session]);
 
   if (!overview) {
     return <Screen />;
@@ -45,6 +47,17 @@ export default function ChargingScreen() {
       <AppHeader title="Charging" subtitle="Track your charging sessions." />
 
       <ChargingOverviewCard status={currentStatus} lastCharge={lastCharge} batteryPercent={batteryPercent} />
+
+      {overview.simulation ? (
+        <Card style={styles.nearbyCard}>
+          <View style={styles.nearbyText}>
+            <Text style={styles.nearbyTitle}>Simulated vehicle readings</Text>
+            <Text style={styles.nearbySubtitle}>
+              {overview.simulation.elapsed} · {overview.simulation.voltageV} V · {overview.simulation.currentA} A · {overview.simulation.temperatureC} °C
+            </Text>
+          </View>
+        </Card>
+      ) : null}
 
       <ChargingSummaryCard
         sessions={weeklySummary.sessions}

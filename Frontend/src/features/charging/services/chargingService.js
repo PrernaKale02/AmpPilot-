@@ -1,5 +1,10 @@
 import { api } from "../../../services/api";
 import { chargingHistoryMock, chargingOverviewMock } from "../data/charging";
+import {
+  getSimulationElapsedLabel,
+  getSimulatedChargingSession,
+  getSimulationTelemetry,
+} from "../../battery/services/simulationData";
 
 /**
  * Fetches charging session history, most recent first.
@@ -9,8 +14,11 @@ import { chargingHistoryMock, chargingOverviewMock } from "../data/charging";
  *
  * @returns {Promise<typeof chargingHistoryMock>}
  */
-export async function getChargingHistory() {
-  return chargingHistoryMock;
+export async function getChargingHistory(session) {
+  const simulatedSession = getSimulatedChargingSession(session);
+  return simulatedSession
+    ? [simulatedSession, ...chargingHistoryMock]
+    : chargingHistoryMock;
 }
 
 /**
@@ -22,8 +30,26 @@ export async function getChargingHistory() {
  *
  * @returns {Promise<typeof chargingOverviewMock>}
  */
-export async function getChargingOverview() {
-  return chargingOverviewMock;
+export async function getChargingOverview(session) {
+  const telemetry = getSimulationTelemetry(session);
+  if (!telemetry) return chargingOverviewMock;
+
+  const simulatedSession = getSimulatedChargingSession(session);
+  return {
+    ...chargingOverviewMock,
+    currentStatus: `${telemetry.direction[0].toUpperCase()}${telemetry.direction.slice(1)} · Simulated`,
+    batteryPercent: telemetry.stateOfChargePercent,
+    recentSessions: simulatedSession
+      ? [simulatedSession, ...chargingOverviewMock.recentSessions]
+      : chargingOverviewMock.recentSessions,
+    simulation: {
+      elapsed: getSimulationElapsedLabel(session),
+      temperatureC: telemetry.temperatureC,
+      voltageV: telemetry.voltageV,
+      currentA: telemetry.currentA,
+      batteryStatus: telemetry.batteryStatus,
+    },
+  };
 }
 
 /**

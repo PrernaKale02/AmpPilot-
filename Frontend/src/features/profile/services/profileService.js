@@ -1,4 +1,5 @@
 import { profileMock } from "../data/profile";
+import { getSimulationTelemetry } from "../../battery/services/simulationData";
 
 /**
  * Fetches the profile overview: account owner, connected vehicle, driving
@@ -9,6 +10,16 @@ import { profileMock } from "../data/profile";
  *
  * @returns {Promise<typeof profileMock>}
  */
-export async function getProfile() {
-  return profileMock;
+export async function getProfile(session) {
+  const telemetry = getSimulationTelemetry(session);
+  if (!telemetry) return profileMock;
+
+  return {
+    ...profileMock,
+    vehicle: {
+      ...profileMock.vehicle,
+      name: "Virtual EV",
+      status: `Simulation ${session.status}`,
+    },
+  };
 }

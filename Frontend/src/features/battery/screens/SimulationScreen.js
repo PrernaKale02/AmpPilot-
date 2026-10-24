@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -6,14 +6,13 @@ import { AppHeader, Screen } from "../../../components/layout";
 import { Button, Card } from "../../../components/ui";
 import { Theme } from "../../../theme/theme";
 import {
-  getSimulationStatus,
   pauseSimulation,
   resumeSimulation,
   startSimulation,
   stopSimulation,
 } from "../services/simulationService";
 import { LiveSimulationDashboard } from "../components/LiveSimulationDashboard";
-import { announceSimulationEvents } from "../../notifications/services/voiceAlerts";
+import { useSimulationStore } from "../../../store/simulationStore";
 
 const SPEEDS = [1, 2, 5, 10, 30];
 const INTERVALS = [0.5, 1, 5];
@@ -32,43 +31,16 @@ function messageFrom(error) {
 /** Configures a local virtual-EV session; it never represents live telemetry. */
 export default function SimulationScreen() {
   const navigation = useNavigation();
-  const [session, setSession] = useState(null);
-  const [duration, setDuration] = useState("15");
-  const [speed, setSpeed] = useState(1);
-  const [interval, setInterval] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const session = useSimulationStore((state) => state.session);
+  const statusLoaded = useSimulationStore((state) => state.statusLoaded);
+  const statusError = useSimulationStore((state) => state.statusError);
+  const config = useSimulationStore((state) => state.config);
+  const setSession = useSimulationStore((state) => state.setSession);
+  const setConfig = useSimulationStore((state) => state.setConfig);
+  const [duration, setDuration] = useState(String(config.durationMinutes));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [configExpanded, setConfigExpanded] = useState(false);
-  // false until the first status load; old events are then marked heard, not spoken
-  const voicePrimedRef = useRef(false);
-
-  const refreshStatus = async () => {
-    try {
-      const nextSession = await getSimulationStatus();
-      setSession(nextSession);
-      announceSimulationEvents(nextSession?.events, { silent: !voicePrimedRef.current });
-      voicePrimedRef.current = true;
-      setError("");
-    } catch (requestError) {
-      setError(messageFrom(requestError));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    refreshStatus();
-  }, []);
-
-  useEffect(() => {
-    if (session?.status !== "running") return undefined;
-
-    const pollEveryMs = (session.config?.telemetryIntervalSeconds || interval) * 1000;
-    const timer = globalThis.setInterval(refreshStatus, pollEveryMs);
-    return () => clearInterval(timer);
-  }, [session?.status, session?.config?.telemetryIntervalSeconds, interval]);
-
   const isConfigurable = !session || ["idle", "completed"].includes(session.status);
 
   const applyAction = async (action) => {
@@ -92,14 +64,15 @@ export default function SimulationScreen() {
     applyAction(() =>
       startSimulation({
         durationMinutes,
-        speedMultiplier: speed,
-        telemetryIntervalSeconds: interval,
+        speedMultiplier: config.speedMultiplier,
+        telemetryIntervalSeconds: config.telemetryIntervalSeconds,
       })
     );
   };
 
   const status = session?.status || "idle";
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+  const loading = !statusLoaded;
 
   return (
     <Screen scroll contentContainerStyle={styles.content}>
@@ -143,7 +116,7 @@ export default function SimulationScreen() {
         >
           <View>
             <Text style={styles.sectionLabel}>Simulation configuration</Text>
-            <Text style={styles.configSummary}>{duration} min · {speed}× · every {interval}s</Text>
+            <Text style={styles.configSummary}>{duration} min · {config.speedMultiplier}× · every {config.telemetryIntervalSeconds}s</Text>
           </View>
           <Ionicons name={configExpanded ? "chevron-up" : "chevron-down"} size={20} color={Theme.colors.textSecondary} />
         </Pressable>
@@ -152,7 +125,13 @@ export default function SimulationScreen() {
             <Text style={styles.fieldLabel}>Duration (real-time minutes)</Text>
             <TextInput
               value={duration}
-              onChangeText={setDuration}
+              onChangeText={(value) => {
+                setDuration(value);
+                const minutes = Number(value);
+                if (Number.isInteger(minutes) && minutes >= 1 && minutes <= 60) {
+                  setConfig({ durationMinutes: minutes });
+                }
+              }}
               editable={isConfigurable && !submitting}
               keyboardType="number-pad"
               maxLength={2}
@@ -162,25 +141,25 @@ export default function SimulationScreen() {
             <OptionGroup
               label="Simulation speed"
               options={SPEEDS}
-              value={speed}
+              value={config.speedMultiplier}
               format={(value) => `${value}×`}
               disabled={!isConfigurable || submitting}
-              onChange={setSpeed}
+              onChange={(speedMultiplier) => setConfig({ speedMultiplier })}
             />
             <OptionGroup
               label="Telemetry update interval"
               options={INTERVALS}
-              value={interval}
+              value={config.telemetryIntervalSeconds}
               format={(value) => `${value} seconds`}
               disabled={!isConfigurable || submitting}
-              onChange={setInterval}
+              onChange={(telemetryIntervalSeconds) => setConfig({ telemetryIntervalSeconds })}
             />
             <Text style={styles.autoStop}>The session automatically stops when its duration is reached.</Text>
           </View>
         ) : null}
       </Card>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error || statusError ? <Text style={styles.error}>{error || statusError}</Text> : null}
       {loading ? <Text style={styles.loading}>Loading simulation status…</Text> : null}
 
       <View style={styles.actions}>

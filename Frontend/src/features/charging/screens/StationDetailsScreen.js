@@ -5,6 +5,7 @@ import { Screen } from "../../../components/layout";
 import { Card, Button, SettingRow, SettingsSection } from "../../../components/ui";
 import { Theme } from "../../../theme/theme";
 import { getStationStatusStyle } from "../components/stationStatusStyles";
+import { SimulationControls } from "../../battery/components/SimulationControls";
 
 const CHARGER_TYPE_LABELS = {
   AC: "AC Charging",
@@ -147,15 +148,18 @@ export default function StationDetailsScreen() {
   return (
     <Screen scroll contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          hitSlop={8}
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-        >
-          <Ionicons name="chevron-back" size={22} color={Theme.colors.textSecondary} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            hitSlop={8}
+            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+          >
+            <Ionicons name="chevron-back" size={22} color={Theme.colors.textSecondary} />
+          </Pressable>
+          <SimulationControls />
+        </View>
 
         <Card style={styles.heroCard}>
           <View style={styles.heroTop}>
@@ -227,6 +231,11 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: Theme.spacing.md,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   backButton: {
     width: 40,

@@ -1,5 +1,6 @@
 import { api } from "../../../services/api";
 import { batteryMock } from "../data/battery";
+import { getSimulationTelemetry } from "./simulationData";
 
 /**
  * Fetches the current battery overview: score, status, key metrics, and a
@@ -10,8 +11,23 @@ import { batteryMock } from "../data/battery";
  *
  * @returns {Promise<typeof batteryMock>}
  */
-export async function getBattery() {
-  return batteryMock;
+export async function getBattery(session) {
+  const telemetry = getSimulationTelemetry(session);
+  if (!telemetry) return batteryMock;
+
+  return {
+    ...batteryMock,
+    subtitle: `Simulated ${telemetry.direction} · ${telemetry.voltageV} V · ${telemetry.currentA} A`,
+    metrics: {
+      ...batteryMock.metrics,
+      stateOfCharge: { value: telemetry.stateOfChargePercent, unit: "%" },
+      estimatedRange: {
+        value: Math.round((batteryMock.metrics.estimatedRange.value * telemetry.stateOfChargePercent) / 90),
+        unit: batteryMock.metrics.estimatedRange.unit,
+      },
+      temperature: { value: telemetry.temperatureC, unit: "°C" },
+    },
+  };
 }
 
 /**

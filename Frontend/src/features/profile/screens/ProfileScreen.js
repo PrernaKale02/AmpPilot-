@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen, AppHeader } from "../../../components/layout";
@@ -10,6 +10,7 @@ import { ConnectedVehicleCard } from "../components/ConnectedVehicleCard";
 import { ProfileStatCard } from "../components/ProfileStatCard";
 import { AchievementCard } from "../components/AchievementCard";
 import { AccountStatusCard } from "../components/AccountStatusCard";
+import { useSimulationStore } from "../../../store/simulationStore";
 
 const STAT_ICONS = {
   totalDistance: "map-outline",
@@ -41,20 +42,27 @@ export default function ProfileScreen() {
   const [data, setData] = useState(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [units, setUnits] = useState("Metric");
+  const session = useSimulationStore((state) => state.session);
+  const preferencesInitialized = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
-    getProfile().then((result) => {
+    getProfile(session).then((result) => {
       if (isMounted) {
-        setData(result);
-        setNotificationsEnabled(result.preferences.notifications);
-        setUnits(result.preferences.units);
+        setData((current) => current
+          ? { ...result, preferences: current.preferences }
+          : result);
+        if (!preferencesInitialized.current) {
+          setNotificationsEnabled(result.preferences.notifications);
+          setUnits(result.preferences.units);
+          preferencesInitialized.current = true;
+        }
       }
     });
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [session]);
 
   if (!data) {
     return <Screen />;

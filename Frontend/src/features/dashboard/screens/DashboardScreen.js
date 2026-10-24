@@ -5,6 +5,7 @@ import { Screen, AppHeader } from "../../../components/layout";
 import { Card } from "../../../components/ui/Card";
 import { Theme } from "../../../theme/theme";
 import { getDashboard } from "../services/dashboardService";
+import { useSimulationStore } from "../../../store/simulationStore";
 
 /**
  * Dashboard screen. Gives a calm, at-a-glance overview of the user's
@@ -14,22 +15,23 @@ import { getDashboard } from "../services/dashboardService";
  */
 export default function DashboardScreen() {
   const [dashboard, setDashboard] = useState(null);
+  const session = useSimulationStore((state) => state.session);
 
   useEffect(() => {
     let isMounted = true;
-    getDashboard().then((data) => {
+    getDashboard(session).then((data) => {
       if (isMounted) setDashboard(data);
     });
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [session]);
 
   if (!dashboard) {
     return <Screen />;
   }
 
-  const { greeting, batteryHealth, vehicle, insight, recentCharging } = dashboard;
+  const { greeting, batteryHealth, vehicle, insight, recentCharging, simulation } = dashboard;
 
   return (
     <Screen scroll contentContainerStyle={styles.content}>
@@ -59,6 +61,19 @@ export default function DashboardScreen() {
         </View>
         <Text style={styles.cardContent}>{vehicle.summary}</Text>
       </Card>
+
+      {simulation ? (
+        <Card style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="flask-outline" size={16} color={Theme.colors.primary} />
+            <Text style={styles.cardLabel}>Simulated Battery</Text>
+          </View>
+          <Text style={styles.batteryPercentage}>{simulation.stateOfChargePercent}%</Text>
+          <Text style={styles.cardContent}>
+            {simulation.direction} · {simulation.temperatureC} °C · {simulation.batteryStatus}
+          </Text>
+        </Card>
+      ) : null}
 
       <Card style={styles.card}>
         <View style={styles.cardHeader}>

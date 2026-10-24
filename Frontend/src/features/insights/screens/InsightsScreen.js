@@ -7,6 +7,7 @@ import { InsightScoreCard } from "../components/InsightScoreCard";
 import { TodaysInsightCard } from "../components/TodaysInsightCard";
 import { InsightRecommendationCard } from "../components/InsightRecommendationCard";
 import { InsightHistoryCard } from "../components/InsightHistoryCard";
+import { useSimulationStore } from "../../../store/simulationStore";
 
 /**
  * Insights screen — battery score, today's insight, a recommendation with
@@ -18,16 +19,17 @@ import { InsightHistoryCard } from "../components/InsightHistoryCard";
  */
 export default function InsightsScreen() {
   const [insights, setInsights] = useState(null);
+  const session = useSimulationStore((state) => state.session);
 
   useEffect(() => {
     let isMounted = true;
-    getInsights().then((data) => {
+    getInsights(session).then((data) => {
       if (isMounted) setInsights(data);
     });
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [session]);
 
   if (!insights) {
     return <Screen />;

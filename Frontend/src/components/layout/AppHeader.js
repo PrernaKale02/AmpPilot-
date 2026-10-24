@@ -1,21 +1,22 @@
 import { Text, View, StyleSheet } from "react-native";
 import { Theme } from "../../theme/theme";
+import { SimulationControls } from "../../features/battery/components/SimulationControls";
 
 /**
  * Global screen header — the AmpPilot wordmark followed by a page title
  * and optional subtitle. Every top-level screen starts with this so the
  * app reads as one cohesive product rather than a set of loose screens.
  *
- * Laid out as a row so a right-side action (notification bell, profile
- * avatar, etc.) can be added as a sibling of the text group later without
- * restructuring this component.
+ * Simulation controls share this row so they stay reachable without adding
+ * content above the safe-area-aware screen title.
  *
  * @param {object} props
  * @param {string} props.title - Page title, e.g. "Battery".
  * @param {string} [props.subtitle] - Optional page subtitle.
+ * @param {boolean} [props.simulationControls=true] - Show app-wide simulation controls.
  * @returns {React.JSX.Element}
  */
-export function AppHeader({ title, subtitle }) {
+export function AppHeader({ title, subtitle, simulationControls = true }) {
   return (
     <View style={styles.container}>
       <View style={styles.textGroup}>
@@ -23,6 +24,7 @@ export function AppHeader({ title, subtitle }) {
         <Text style={styles.title}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
+      {simulationControls ? <SimulationControls /> : null}
     </View>
   );
 }
@@ -30,7 +32,8 @@ export function AppHeader({ title, subtitle }) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
+    gap: Theme.spacing.sm,
     marginTop: Theme.spacing.sm,
   },
   textGroup: {

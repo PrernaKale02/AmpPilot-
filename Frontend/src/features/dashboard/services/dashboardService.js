@@ -1,4 +1,5 @@
 import { dashboardMock } from "../data/dashboard";
+import { getSimulationTelemetry } from "../../battery/services/simulationData";
 
 /**
  * Fetches the dashboard summary.
@@ -9,6 +10,28 @@ import { dashboardMock } from "../data/dashboard";
  *
  * @returns {Promise<typeof dashboardMock>}
  */
-export async function getDashboard() {
-  return dashboardMock;
+export async function getDashboard(session) {
+  const telemetry = getSimulationTelemetry(session);
+  if (!telemetry) return dashboardMock;
+
+  return {
+    ...dashboardMock,
+    simulation: {
+      status: session.status,
+      stateOfChargePercent: telemetry.stateOfChargePercent,
+      temperatureC: telemetry.temperatureC,
+      direction: telemetry.direction,
+      batteryStatus: telemetry.batteryStatus,
+    },
+    vehicle: {
+      ...dashboardMock.vehicle,
+      connected: true,
+      name: "Virtual EV",
+      summary: `Virtual EV · ${telemetry.stateOfChargePercent}% charge`,
+    },
+    insight: {
+      ...dashboardMock.insight,
+      message: `Simulated battery is ${telemetry.batteryStatus} and ${telemetry.direction}.`,
+    },
+  };
 }

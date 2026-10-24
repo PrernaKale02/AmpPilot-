@@ -7,6 +7,7 @@ import { Card } from "../../../components/ui/Card";
 import { Theme } from "../../../theme/theme";
 import { getBattery } from "../services/batteryService";
 import { BatteryMetricCard } from "../components/BatteryMetricCard";
+import { useSimulationStore } from "../../../store/simulationStore";
 
 const METRIC_ICONS = {
   stateOfHealth: "pulse-outline",
@@ -35,16 +36,17 @@ const METRIC_LABELS = {
 export default function BatteryScreen() {
   const navigation = useNavigation();
   const [battery, setBattery] = useState(null);
+  const session = useSimulationStore((state) => state.session);
 
   useEffect(() => {
     let isMounted = true;
-    getBattery().then((data) => {
+    getBattery(session).then((data) => {
       if (isMounted) setBattery(data);
     });
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [session]);
 
   if (!battery) {
     return <Screen />;

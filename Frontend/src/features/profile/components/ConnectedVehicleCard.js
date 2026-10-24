@@ -6,6 +6,9 @@ import { Theme } from "../../../theme/theme";
 const STATUS_COLOR = {
   Connected: Theme.colors.success,
   Disconnected: Theme.colors.textMuted,
+  "Simulation running": Theme.colors.success,
+  "Simulation paused": Theme.colors.warning,
+  "Simulation completed": Theme.colors.primary,
 };
 
 /**

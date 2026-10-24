@@ -7,6 +7,7 @@ import { ChargingNavigator } from "./ChargingNavigator";
 import InsightsScreen from "../features/insights/screens/InsightsScreen";
 import ProfileScreen from "../features/profile/screens/ProfileScreen";
 import { AssistantButton } from "../features/assistant/components/AssistantButton";
+import { SimulationSync } from "../features/battery/components/SimulationSync";
 import { Theme } from "../theme/theme";
 
 const Tab = createBottomTabNavigator();
@@ -31,31 +32,34 @@ const TAB_ICONS = {
  */
 export function MainTabNavigator() {
   return (
-    <Tab.Navigator
-      screenLayout={({ children, navigation }) => (
-        <View style={{ flex: 1 }}>
-          {children}
-          <AssistantButton navigation={navigation} />
-        </View>
-      )}
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: Theme.colors.primary,
-        tabBarInactiveTintColor: Theme.colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: Theme.colors.surface,
-          borderTopColor: Theme.colors.border,
-        },
-        tabBarIcon: ({ color, size }) => (
-          <Ionicons name={TAB_ICONS[route.name]} size={size} color={color} />
-        ),
-      })}
-    >
-      <Tab.Screen name="Home" component={DashboardScreen} />
-      <Tab.Screen name="Battery" component={BatteryScreen} />
-      <Tab.Screen name="Charging" component={ChargingNavigator} />
-      <Tab.Screen name="Insights" component={InsightsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
+    <>
+      <SimulationSync />
+      <Tab.Navigator
+        screenLayout={({ children, navigation }) => (
+          <View style={{ flex: 1 }}>
+            {children}
+            <AssistantButton navigation={navigation} />
+          </View>
+        )}
+        screenOptions={({ route }) => ({
+          headerShown: false,
+          tabBarActiveTintColor: Theme.colors.primary,
+          tabBarInactiveTintColor: Theme.colors.textMuted,
+          tabBarStyle: {
+            backgroundColor: Theme.colors.surface,
+            borderTopColor: Theme.colors.border,
+          },
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name={TAB_ICONS[route.name]} size={size} color={color} />
+          ),
+        })}
+      >
+        <Tab.Screen name="Home" component={DashboardScreen} />
+        <Tab.Screen name="Battery" component={BatteryScreen} />
+        <Tab.Screen name="Charging" component={ChargingNavigator} />
+        <Tab.Screen name="Insights" component={InsightsScreen} />
+        <Tab.Screen name="Profile" component={ProfileScreen} />
+      </Tab.Navigator>
+    </>
   );
 }
