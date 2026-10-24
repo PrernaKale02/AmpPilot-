@@ -3,8 +3,11 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, Vi
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import * as Speech from "expo-speech";
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } from "expo-audio";
 import { Theme } from "../../../theme/theme";
-import { askAssistant } from "../services/assistantService";
+import { askAssistant, askAssistantByVoice } from "../services/assistantService";
+
+const MAX_RECORDING_MS = 10000; // auto-stop long recordings
 
 /** Browser speech recognition (Safari/Chrome). Returns null where unavailable. */
 function createRecognizer() {
@@ -29,7 +32,11 @@ function say(text) {
   Speech.speak(text, { language: "en-IN", rate: 0.95 });
 }
 
-/** Floating mic: listen → ask the backend assistant → speak the reply → act. */
+/**
+ * Floating mic: listen → ask the backend assistant → speak the reply → act.
+ * Web: browser speech recognition. Phone app: records audio, the backend
+ * transcribes it with Gemini.
+ */
 export function AssistantButton({ navigation }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState("idle"); // idle | listening | thinking
@@ -37,7 +44,24 @@ export function AssistantButton({ navigation }) {
   const [reply, setReply] = useState("");
   const [typed, setTyped] = useState("");
   const recognizerRef = useRef(null);
+  const stopTimerRef = useRef(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
+  const handleResult = (result) => {
+    setReply(result.reply);
+    say(result.reply);
+    if (result.action === "show_stations") {
+      navigation.navigate("Charging", { screen: "NearbyStations" });
+    }
+  };
+
+  const handleFailure = () => {
+    const message = "Sorry, the assistant is unavailable right now.";
+    setReply(message);
+    say(message);
+  };
+
+  // Typed question, or a transcript from browser speech recognition
   const ask = async (message) => {
     const text = message.trim();
     if (!text) return;
@@ -46,29 +70,58 @@ export function AssistantButton({ navigation }) {
     setState("thinking");
     try {
       const location = await getLocation();
-      const result = await askAssistant({ message: text, ...location });
-      setReply(result.reply);
-      say(result.reply);
-      if (result.action === "show_stations") {
-        navigation.navigate("Charging", { screen: "NearbyStations" });
-      }
+      handleResult(await askAssistant({ message: text, ...location }));
     } catch {
-      const message = "Sorry, the assistant is unavailable right now.";
-      setReply(message);
-      say(message);
+      handleFailure();
     } finally {
       setState("idle");
     }
   };
 
-  const onMicPress = () => {
-    setOpen(true);
-    if (state === "listening") {
-      recognizerRef.current?.stop();
+  // ---- Phone app: record, then send the audio ----
+  const startRecording = async () => {
+    const { granted } = await AudioModule.requestRecordingPermissionsAsync();
+    if (!granted) {
+      setReply("Microphone permission is needed to ask by voice. You can type your question below.");
       return;
     }
+    Speech.stop();
+    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+    await recorder.prepareToRecordAsync();
+    recorder.record();
+    setHeard("");
+    setReply("");
+    setState("listening");
+    stopTimerRef.current = setTimeout(() => stopRecording(), MAX_RECORDING_MS);
+  };
+
+  const stopRecording = async () => {
+    clearTimeout(stopTimerRef.current);
+    setState("thinking");
+    try {
+      await recorder.stop();
+      // switch back to playback so the reply plays through the speaker
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      const uri = recorder.uri;
+      if (!uri) throw new Error("No recording");
+      const location = await getLocation();
+      const result = await askAssistantByVoice({ uri, ...location });
+      setHeard(result.transcript || "(didn't catch that)");
+      handleResult(result);
+    } catch {
+      handleFailure();
+    } finally {
+      setState("idle");
+    }
+  };
+
+  // ---- Web: browser speech recognition ----
+  const startWebListening = () => {
     const recognizer = createRecognizer();
-    if (!recognizer) return; // no speech recognition here: use the text box instead
+    if (!recognizer) {
+      setReply("Voice input isn't supported in this browser. Please use Chrome or Safari, or type below.");
+      return;
+    }
     recognizerRef.current = recognizer;
     recognizer.lang = "en-IN";
     recognizer.interimResults = false;
@@ -83,13 +136,27 @@ export function AssistantButton({ navigation }) {
     recognizer.start();
   };
 
+  const onMicPress = () => {
+    setOpen(true);
+    if (state === "thinking") return;
+    if (Platform.OS === "web") {
+      if (state === "listening") recognizerRef.current?.stop();
+      else startWebListening();
+      return;
+    }
+    if (state === "listening") stopRecording();
+    else startRecording();
+  };
+
   const sendTyped = () => {
     ask(typed);
     setTyped("");
   };
 
   const statusText =
-    state === "listening" ? "Listening…" : state === "thinking" ? "Thinking…" : "Ask AmpPilot";
+    state === "listening"
+      ? Platform.OS === "web" ? "Listening…" : "Listening… tap to stop"
+      : state === "thinking" ? "Thinking…" : "Ask AmpPilot";
 
   return (
     <>
