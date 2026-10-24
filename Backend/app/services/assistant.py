@@ -166,3 +166,28 @@ async def ask_assistant(message: str, latitude=None, longitude=None) -> tuple[st
             logger.warning("Model %s unavailable (%s); trying next model.", model, exc.code)
             last_error = exc
     raise RuntimeError("All Gemini models are busy right now.") from last_error
+
+TRANSCRIBE_PROMPT = (
+    "Transcribe the speech in this audio exactly as spoken, in the language spoken "
+    "(English, Hindi or Marathi). Return only the transcript, with no extra words. "
+    "If there is no clear speech, return an empty string."
+)
+
+
+async def transcribe_audio(audio: bytes, mime_type: str) -> str:
+    """Speech to text with Gemini, using the same model fallback as the assistant."""
+    client = _get_client()
+    last_error: Exception | None = None
+    for model in _models():
+        try:
+            response = await client.aio.models.generate_content(
+                model=model,
+                contents=[types.Part.from_bytes(data=audio, mime_type=mime_type), TRANSCRIBE_PROMPT],
+            )
+            return (response.text or "").strip()
+        except errors.APIError as exc:
+            if getattr(exc, "code", None) not in RETRYABLE_STATUS:
+                raise
+            logger.warning("Model %s unavailable for transcription (%s); trying next.", model, exc.code)
+            last_error = exc
+    raise RuntimeError("All Gemini models are busy right now.") from last_error
