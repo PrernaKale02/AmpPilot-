@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,6 +13,7 @@ import {
   stopSimulation,
 } from "../services/simulationService";
 import { LiveSimulationDashboard } from "../components/LiveSimulationDashboard";
+import { announceSimulationEvents } from "../../notifications/services/voiceAlerts";
 
 const SPEEDS = [1, 2, 5, 10, 30];
 const INTERVALS = [0.5, 1, 5];
@@ -39,11 +40,15 @@ export default function SimulationScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [configExpanded, setConfigExpanded] = useState(false);
+  // false until the first status load; old events are then marked heard, not spoken
+  const voicePrimedRef = useRef(false);
 
   const refreshStatus = async () => {
     try {
       const nextSession = await getSimulationStatus();
       setSession(nextSession);
+      announceSimulationEvents(nextSession?.events, { silent: !voicePrimedRef.current });
+      voicePrimedRef.current = true;
       setError("");
     } catch (requestError) {
       setError(messageFrom(requestError));
