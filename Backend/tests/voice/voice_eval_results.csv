@@ -1,0 +1,16 @@
+file,lang,intent,expected,status,transcript,reply,action,recognised,correct,seconds
+en_01.m4a,English,battery,What is my battery level,200,What is my battery level?,"Your battery is at 81.9 percent charge, based on our simulation.",,True,True,6.21
+en_02.m4a,English,stations,Find the nearest charging station,200,Find the nearest charging station.,"The nearest charging station is MobiLane Saya Grand By Treat, which is six point eight kilometers away. I have also opened the station map for you.",show_stations,True,True,3.56
+en_03.m4a,English,battery,How much charge is left in my battery,200,How much charge is left in my battery?,Your simulated battery is at eighty-one point five percent charge.,,True,True,3.91
+en_04.m4a,English,stations,Where can I charge my car nearby,200,Where can I charge my car nearby?,"The nearest charging station is MobiLane Saya Grand By Treat, about 6.8 kilometers away. I have opened the station map for you.",show_stations,True,True,4.02
+en_05.m4a,English,battery,Tell me my battery percentage,200,Tell me my battery percentage.,"Your battery is at 81 percent, based on our simulation.",,True,True,3.25
+hi_01.m4a,Hindi,battery,मेरी बैटरी कितनी है,200,मेरी बैटरी कितनी है?,"यह सिमुलेशन बैटरी है, और इसका चार्ज 80.9 प्रतिशत है।",,True,True,5.5
+hi_02.m4a,Hindi,stations,सबसे पास का चार्जिंग स्टेशन दिखाओ,200,सबसे पास का चार्जिंग स्टेशन दिखाओ।,"सबसे पास चार्जिंग स्टेशन MobiLane Saya Grand By Treat है, जो छ दशमलव आठ किलोमीटर दूर है। मैंने ऐप पर स्टेशन का नक़्शा खोल दिया है।",show_stations,True,True,5.76
+hi_03.m4a,Hindi,battery,बैटरी में कितना चार्ज बचा है,200,बैटरी में कितना चार्ज बचा है?,"बैटरी में अभी 80% चार्ज बचा है, और ये सिम्युलेटेड डेटा है।",,True,True,3.5
+hi_04.m4a,Hindi,stations,पास में गाड़ी कहाँ चार्ज कर सकते हैं,200,पास में गाड़ी कहाँ चार्ज कर सकते हैं?,"पास ही में MobiLane Saya Grand By Treat चार्जिंग स्टेशन है, जो लगभग छह दशमलव आठ किलोमीटर दूर है। मैंने ऐप पर चार्जिंग स्टेशन का नक्शा भी खोल दिया है।",show_stations,True,True,3.97
+hi_05.m4a,Hindi,battery,मेरी बैटरी का प्रतिशत बताओ,200,Meri battery ka pratishat batao.,"Aapki battery ka charge abhi kareeb asi percent hai. Yeh simulated data hai, asli gaadi ka nahi.",,False,True,7.03
+mr_01.m4a,Marathi,battery,माझी बॅटरी किती आहे,200,माझी बॅटरी किती आहे?,सध्या तुमच्या बॅटरीचा चार्ज ७९.७ टक्के आहे. हे सिम्युलेटेड वाचन आहे.,,True,True,5.61
+mr_02.m4a,Marathi,stations,जवळचे चार्जिंग स्टेशन दाखव,200,जवळचे चार्जिंग स्टेशन दाखव.,मी तुमच्या जवळचे चार्जिंग स्टेशन दाखवले आहे. सर्वात जवळचे स्टेशन सुमारे ६.८ किलोमीटर अंतरावर आहे.,show_stations,True,True,4.28
+mr_03.m4a,Marathi,battery,बॅटरीमध्ये किती चार्ज शिल्लक आहे,200,बॅटरीमध्ये किती चार्ज शिल्लक आहे?,तुमच्या बॅटरीमध्ये ७९.३% चार्ज शिल्लक आहे. हे आकडे एका सिम्युलेशनमधून घेतलेले आहेत.,,True,True,3.46
+mr_04.m4a,Marathi,stations,जवळपास गाडी कुठे चार्ज करू शकतो,200,जवळपास गाडी कुठे चार्ज करू शकतं?,"जवळपास सर्वात जवळचे चार्जिंग स्टेशन मोबीलेन साया ग्रँड बाय ट्रीट आहे, जे सुमारे सहा पूर्णांक आठ किलोमीटर अंतरावर आहे.",show_stations,True,True,3.87
+mr_05.m4a,Marathi,battery,माझ्या बॅटरीची टक्केवारी सांग,200,माझ्या बॅटरीची टक्केवारी सांगा.,"सध्या तुमच्या बॅटरीची टक्केवारी ७८.८ टक्के आहे. लक्षात ठेवा, ही सिम्युलेटेड रीडिंग्ज आहेत.",,True,True,5.3

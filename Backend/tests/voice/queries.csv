@@ -1,0 +1,16 @@
+file,lang,intent,expected
+en_01.m4a,English,battery,What is my battery level
+en_02.m4a,English,stations,Find the nearest charging station
+en_03.m4a,English,battery,How much charge is left in my battery
+en_04.m4a,English,stations,Where can I charge my car nearby
+en_05.m4a,English,battery,Tell me my battery percentage
+hi_01.m4a,Hindi,battery,मेरी बैटरी कितनी है
+hi_02.m4a,Hindi,stations,सबसे पास का चार्जिंग स्टेशन दिखाओ
+hi_03.m4a,Hindi,battery,बैटरी में कितना चार्ज बचा है
+hi_04.m4a,Hindi,stations,पास में गाड़ी कहाँ चार्ज कर सकते हैं
+hi_05.m4a,Hindi,battery,मेरी बैटरी का प्रतिशत बताओ
+mr_01.m4a,Marathi,battery,माझी बॅटरी किती आहे
+mr_02.m4a,Marathi,stations,जवळचे चार्जिंग स्टेशन दाखव
+mr_03.m4a,Marathi,battery,बॅटरीमध्ये किती चार्ज शिल्लक आहे
+mr_04.m4a,Marathi,stations,जवळपास गाडी कुठे चार्ज करू शकतो
+mr_05.m4a,Marathi,battery,माझ्या बॅटरीची टक्केवारी सांग

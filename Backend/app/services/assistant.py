@@ -169,7 +169,8 @@ async def ask_assistant(message: str, latitude=None, longitude=None) -> tuple[st
 
 TRANSCRIBE_PROMPT = (
     "Transcribe the speech in this audio exactly as spoken, in the language spoken "
-    "(English, Hindi or Marathi). Return only the transcript, with no extra words. "
+    "(English, Hindi or Marathi). Write Hindi and Marathi in Devanagari script, English in Latin script. "
+    "Return only the transcript, with no extra words. "
     "If there is no clear speech, return an empty string."
 )
 
