@@ -35,3 +35,19 @@ class UpstreamNotConfigured(AmpPilotError):
     Maps to HTTP 503: the service is deployed but cannot do its job, which is
     an operator problem rather than a caller problem.
     """
+
+
+class ModelUnavailable(AmpPilotError):
+    """The battery health model cannot be loaded (weights or config missing/invalid).
+
+    Maps to HTTP 503: the service is up but the ML model is not usable, which
+    is an operator problem (deployment), not a caller problem.
+    """
+
+
+class DemoSessionNotFound(AmpPilotError):
+    """The requested demo session id does not exist. Maps to HTTP 404."""
+
+
+class RulNotFound(AmpPilotError):
+    """No precomputed remaining-useful-life estimate exists for that car. Maps to HTTP 404."""

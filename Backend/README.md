@@ -23,7 +23,7 @@ Backend/
 │   └── services/
 │       ├── open_charge_map.py   OCM HTTP client
 │       └── mappers.py           OCM POI -> ChargingStation (pure)
-└── tests/                       80 tests, no network access
+└── tests/                       no network access; no torch or model weights needed
 ```
 
 ## Setup
@@ -60,11 +60,11 @@ Liveness probe. Calls no external service and needs no API key.
 
 ### `GET /api/charging-stations`
 
-| Param | Type | Required | Default | Validation |
-|---|---|---|---|---|
-| `latitude` | float | yes | — | −90 … 90 |
-| `longitude` | float | yes | — | −180 … 180 |
-| `radius_km` | float | no | 10 | > 0, ≤ 50 |
+| Param       | Type  | Required | Default | Validation |
+| ----------- | ----- | -------- | ------- | ---------- |
+| `latitude`  | float | yes      | —       | −90 … 90   |
+| `longitude` | float | yes      | —       | −180 … 180 |
+| `radius_km` | float | no       | 10      | > 0, ≤ 50  |
 
 ```bash
 curl "http://localhost:8001/api/charging-stations?latitude=19.0760&longitude=72.8777&radius_km=15"
@@ -107,6 +107,30 @@ Errors: `422` invalid parameters · `502` provider failure · `504` provider
 timeout · `503` missing API key. Zero results is a **200 with an empty
 `stations` array**, not a 404.
 
+## Battery health model
+
+| Endpoint                          | Purpose                                                                                                                                                                                                                                                               |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /battery/predict`           | Body `{"readings": [[8 numbers] x 128], "dataset": 1\|2\|3 (optional), "include_attention": false}`. Returns `capacity`, `soh_percent`, `fault_probability` (experimental risk score, no yes/no), `model_name`, `normalisation` (+ attention weights when requested). |
+| `POST /battery/explain`           | Same body. Returns the fault score, per-sensor `channel_sensitivity` and the 5 `top_attention_rows`, for that one session.                                                                                                                                            |
+| `POST /battery/rul`               | Body `{"history": [{"mileage_km", "soh_percent"} x >=5]}`. Straight-line State-of-Health trend to the 80% threshold. Not from the neural network.                                                                                                                     |
+| `GET /battery/rul/{car_id}`       | The notebook's precomputed estimate for a car (`1_105`, from `rul_estimates.csv`). 404 when the car has none.                                                                                                                                                         |
+| `GET /battery/demo-sessions`      | Demo sessions: the bundled sample plus the healthy/faulty cars in `app/ml_models/demo/*.json` (made by `make_demo_sessions_colab.py`).                                                                                                                                |
+| `GET /battery/demo-sessions/{id}` | Predicts one demo session. `true_label` in the response is the dataset's label, not a model output.                                                                                                                                                                   |
+| `GET /battery/demo`               | Shortcut for the bundled sample session.                                                                                                                                                                                                                              |
+| `GET /battery/model-info`         | Which model is deployed and whether it loaded. Never errors.                                                                                                                                                                                                          |
+
+The model weights (`app/ml_models/*.pt`) are **not in git**. Without them the API
+still starts; the model endpoints answer `503 MODEL_UNAVAILABLE`. To deploy a
+newly trained model see `app/ml_models/README.md`.
+
+- `fault_probability` is experimental: fault labels are vehicle-level and
+  single-session fault detection is weak, so the API never returns a yes/no.
+- `rul` values above `RUL_CAP_KM` (default 500,000 km) are cut to the cap and
+  flagged `"capped": true`.
+- Send real sensor sessions only. The charging and simulation endpoints produce
+  data the model was not trained on; do not feed their readings to `/battery/*`.
+
 ## Nulls are deliberate
 
 Open Charge Map is crowd-sourced and mostly sparse. Any field the provider does
@@ -129,7 +153,7 @@ pip install pytest        # dev-only, not in requirements.txt
 pytest
 ```
 
-All 80 tests mock HTTP with `httpx.MockTransport` and never touch the live API.
+All tests mock HTTP with `httpx.MockTransport` (or replace the ML model) and never touch the live API or need the model weights.
 
 Recommended dev extras (not installed): `pytest`, `ruff`.
 
@@ -138,11 +162,11 @@ Recommended dev extras (not installed): `pytest`, `ruff`.
 `localhost` on a phone means the phone itself, not your computer. Bind the
 server with `--host 0.0.0.0`, then point the app at your machine:
 
-| Target | `EXPO_PUBLIC_API_URL` |
-|---|---|
-| Android emulator | `http://10.0.2.2:8001` |
-| iOS simulator | `http://localhost:8001` |
-| Physical device | `http://<your-LAN-IP>:8001` |
+| Target           | `EXPO_PUBLIC_API_URL`       |
+| ---------------- | --------------------------- |
+| Android emulator | `http://10.0.2.2:8001`      |
+| iOS simulator    | `http://localhost:8001`     |
+| Physical device  | `http://<your-LAN-IP>:8001` |
 
 The device must be on the same Wi-Fi, and Windows Firewall must allow inbound
 port 8001. Android release builds block cleartext HTTP — production needs HTTPS.

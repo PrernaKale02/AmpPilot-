@@ -33,16 +33,25 @@ class Settings(BaseSettings):
     open_charge_map_timeout_seconds: float = 6.0
     open_charge_map_max_results: int = 50
 
-    gemini_api_key: str | None = None
-    gemini_model: str = "gemini-3.5-flash-lite"
-    gemini_fallback_models: str = "gemini-3.8-flash,gemini-3.7-flash"
-
     # Kept as a raw string rather than `list[str]`: pydantic-settings parses
     # complex field types out of the environment with `json.loads`, so a plain
     # comma-separated value would raise before any validator could split it.
     cors_allow_origins: str = ""
 
     environment: Literal["development", "production"] = "development"
+
+    # Battery health model files, resolved inside app/ml_models/. To deploy a
+    # different trained model, drop its .pt and the exported config next to the
+    # old ones and point these at them (no code change needed).
+    model_weights_file: str = "final_model_no_mfg.pt"
+    model_config_file: str = "model_config.json"
+
+    # Remaining useful life (RUL). The precomputed per-car table written by the
+    # training notebook, and the largest RUL the API will report. Linear
+    # extrapolation of a nearly flat SoH trend gives absurd numbers, so larger
+    # values are cut to the cap and flagged `capped`.
+    rul_file: str = "rul_estimates.csv"
+    rul_cap_km: float = 500_000.0
 
     @property
     def cors_allow_origins_list(self) -> list[str]:

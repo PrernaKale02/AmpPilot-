@@ -2,7 +2,8 @@ fastapi
 uvicorn[standard]
 httpx
 pydantic-settings
-torch 
+torch
 numpy
 google-genai
 python-multipart
+pytest
