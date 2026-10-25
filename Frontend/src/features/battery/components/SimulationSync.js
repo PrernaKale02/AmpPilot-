@@ -1,10 +1,15 @@
 import { useEffect, useRef } from "react";
-import { getSimulationStatus } from "../services/simulationService";
+import {
+  getSimulationStatus,
+  loadDemoSessions,
+} from "../services/simulationService";
 import { announceSimulationEvents } from "../../notifications/services/voiceAlerts";
 import { useSimulationStore } from "../../../store/simulationStore";
 
 function messageFrom(error) {
-  return error.response?.data?.detail || "Unable to reach the simulation service.";
+  return (
+    error.response?.data?.detail || "Unable to reach the simulation service."
+  );
 }
 
 export function SimulationSync() {
@@ -13,6 +18,12 @@ export function SimulationSync() {
   const setSession = useSimulationStore((state) => state.setSession);
   const setStatusError = useSimulationStore((state) => state.setStatusError);
   const voicePrimedRef = useRef(false);
+
+  // Once at start-up: learn which recorded cars exist and pick a default, so
+  // every way of starting the simulation replays real data.
+  useEffect(() => {
+    void loadDemoSessions();
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -23,7 +34,9 @@ export function SimulationSync() {
         const nextSession = await getSimulationStatus();
         if (!mounted) return;
         setSession(nextSession);
-        announceSimulationEvents(nextSession?.events, { silent: !voicePrimedRef.current });
+        announceSimulationEvents(nextSession?.events, {
+          silent: !voicePrimedRef.current,
+        });
         voicePrimedRef.current = true;
       } catch (error) {
         if (mounted) setStatusError(messageFrom(error));

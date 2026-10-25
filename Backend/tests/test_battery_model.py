@@ -36,16 +36,15 @@ def test_missing_config_falls_back_to_original_constants(tmp_path):
     assert config.per_dataset == {}
 
 
-def test_shipped_config_loads_and_is_usable():
-    """The committed model_config.json must load, whichever notebook wrote it."""
+def test_shipped_config_describes_the_v2_model():
+    """The committed model_config.json is the v2 notebook's export (per-dataset scaling)."""
     shipped = bm.load_config(SHIPPED_CONFIG)
     assert shipped.arch == "BiLSTM+Attn"
     assert shipped.input_size == bm.N_CHANNELS
-    assert shipped.capacity_std > 0 and shipped.soh_std > 0
-    assert np.all(shipped.sensor_std > 0)
-    assert shipped.rul_threshold_soh == 80.0
-    for mean, std in shipped.per_dataset.values():
-        assert mean.shape == (8,) and np.all(std > 0)
+    assert shipped.channels == bm.DEFAULT_CHANNELS
+    assert set(shipped.per_dataset) == {"1", "2", "3"}
+    assert shipped.pooled_is_approximate is True
+    assert 0 < shipped.fault_threshold < 1
 
 
 def test_global_normalisation_of_first_row():

@@ -19,6 +19,15 @@ class SimulationConfig(BaseModel):
     critical_temperature_c: float = Field(50, ge=25, le=80, alias="criticalTemperatureC")
     warning_soc_percent: float = Field(20, ge=1, le=99, alias="warningSocPercent")
     critical_soc_percent: float = Field(10, ge=0, le=99, alias="criticalSocPercent")
+    demo_session_id: str | None = Field(
+        None,
+        alias="demoSessionId",
+        pattern=r"^[A-Za-z0-9_-]{1,64}$",
+        description=(
+            "Id of a recorded demo session (see GET /battery/demo-sessions). When set, the "
+            "simulation replays that real charging session instead of generating readings."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_threshold_order(self) -> "SimulationConfig":
@@ -30,7 +39,10 @@ class SimulationConfig(BaseModel):
 
 
 class SimulatedTelemetry(BaseModel):
-    """One generated battery reading. It is never real vehicle telemetry."""
+    """One battery reading: generated, or replayed from a recorded dataset session.
+
+    It is never live telemetry from the user's own vehicle.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -68,6 +80,8 @@ class SimulationStatus(BaseModel):
     paused_at: str | None = Field(None, alias="pausedAt")
     resumed_at: str | None = Field(None, alias="resumedAt")
     stopped_at: str | None = Field(None, alias="stoppedAt")
+    data_source: Literal["generated", "recorded"] = Field("generated", alias="dataSource")
+    replay_total_seconds: float | None = Field(None, alias="replayTotalSeconds")
     latest_telemetry: SimulatedTelemetry | None = Field(None, alias="latestTelemetry")
     telemetry_history: list[SimulatedTelemetry] = Field(
         default_factory=list, alias="telemetryHistory"

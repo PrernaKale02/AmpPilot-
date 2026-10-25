@@ -68,6 +68,38 @@ export async function getDemoPrediction(sessionId = "sample_session") {
 }
 
 /**
+ * Prediction plus a plain-language explanation for one recorded demo session:
+ * the sensors the fault score reacts to most, and facts measured from the
+ * recording. `risk_level` is a display band over an experimental score, not a
+ * diagnosis. `true_label` is the dataset's label, not a model output.
+ *
+ * @param {string} sessionId - Id from `getDemoSessions()`.
+ * @returns {Promise<{
+ *   session_id: string,
+ *   title: string,
+ *   dataset: 1 | 2 | 3 | null,
+ *   true_label: 0 | 1 | null,
+ *   capacity: number,
+ *   soh_percent: number,
+ *   fault_probability: number,
+ *   risk_level: "elevated" | "low",
+ *   headline: string,
+ *   reasons: Array<{channel: string, label: string, effect_points: number, detail: string}>,
+ *   observed: Record<string, number | string>,
+ *   top_attention_seconds: number[] | null,
+ *   context_note: string | null,
+ *   note: string
+ * }>}
+ */
+export async function getDemoExplanation(sessionId) {
+  const response = await api.get(
+    `/battery/demo-sessions/${encodeURIComponent(sessionId)}/explain`,
+    { timeout: MODEL_TIMEOUT_MS },
+  );
+  return response.data;
+}
+
+/**
  * Sends one real 128 x 8 charging-session reading sequence to the backend
  * battery model. Not used by the Battery screen until the app has a live
  * telemetry source.

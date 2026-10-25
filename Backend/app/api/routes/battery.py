@@ -9,6 +9,7 @@ from app.schemas.battery import (
     BatteryDemoPrediction,
     BatteryPrediction,
     ChargingSessionInput,
+    DemoExplanation,
     DemoSessionInfo,
     ExplanationResult,
     ModelInfo,
@@ -84,6 +85,21 @@ async def list_demo_sessions() -> list[DemoSessionInfo]:
 async def predict_demo_session_by_id(session_id: str) -> BatteryDemoPrediction:
     """Predicts one demo session. `true_label` is the dataset's label, not the model's."""
     return _predict_demo(session_id)
+
+
+@router.get("/demo-sessions/{session_id}/explain", response_model=DemoExplanation)
+async def explain_demo_session(session_id: str) -> DemoExplanation:
+    """Prediction plus a plain-language explanation for one recorded demo session.
+
+    Lists the sensors the fault score reacts to most, with measured facts from the
+    session (for example the gap between the highest and lowest cell voltage).
+    `risk_level` compares the experimental fault score with `FAULT_ALERT_PROBABILITY`;
+    it is a display band, not a diagnosis.
+    """
+    settings = get_settings()
+    return DemoExplanation(
+        **battery_model.explain_demo_session(session_id, settings.fault_alert_probability)
+    )
 
 
 @router.post("/rul", response_model=RulEstimate)

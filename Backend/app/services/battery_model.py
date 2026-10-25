@@ -258,6 +258,128 @@ def channel_sensitivities(
 
 
 # --------------------------------------------------------------------------
+# plain-language explanation (pure numpy, no torch)
+# --------------------------------------------------------------------------
+
+CHANNEL_LABELS = {
+    "voltage": "Voltage",
+    "current": "Current",
+    "SOC": "State of charge",
+    "max_cell_v": "Highest cell voltage",
+    "min_cell_v": "Lowest cell voltage",
+    "max_temp": "Highest temperature",
+    "min_temp": "Lowest temperature",
+    "time": "Time in session",
+}
+MAX_REASONS = 3
+# A channel must move the fault score by at least this much (0-1 scale) to be listed.
+MIN_REASON_EFFECT = 0.01
+_IDLE_CURRENT_A = 0.5
+# Column positions in a recorded session, in DEFAULT_CHANNELS order.
+_V, _I, _SOC, _MAXC, _MINC, _MAXT, _MINT, _T = range(8)
+
+
+def observed_signals(readings: list[list[float]]) -> dict[str, Any]:
+    """Facts measured directly from one 128 x 8 session (no model involved)."""
+    arr = np.asarray(readings, dtype=float)
+    if arr.shape != (N_STEPS, N_CHANNELS):
+        raise ValueError(f"Expected {N_STEPS} x {N_CHANNELS} readings, got {arr.shape}.")
+    mean_current = float(arr[:, _I].mean())
+    if abs(mean_current) <= _IDLE_CURRENT_A:
+        state = "idle"
+    else:
+        state = "charging" if mean_current < 0 else "discharging"
+    return {
+        "state": state,
+        "session_minutes": round(float(arr[-1, _T] - arr[0, _T]) / 60, 1),
+        "soc_start_percent": round(float(arr[0, _SOC]), 1),
+        "soc_end_percent": round(float(arr[-1, _SOC]), 1),
+        "mean_current_a": round(mean_current, 1),
+        "voltage_min_v": round(float(arr[:, _V].min()), 3),
+        "voltage_max_v": round(float(arr[:, _V].max()), 3),
+        "highest_cell_v": round(float(arr[:, _MAXC].max()), 3),
+        "lowest_cell_v": round(float(arr[:, _MINC].min()), 3),
+        "cell_voltage_spread_mv": round(float((arr[:, _MAXC] - arr[:, _MINC]).max()) * 1000, 0),
+        "max_temperature_c": round(float(arr[:, _MAXT].max()), 1),
+        "min_temperature_c": round(float(arr[:, _MINT].min()), 1),
+        "temperature_spread_c": round(float((arr[:, _MAXT] - arr[:, _MINT]).max()), 1),
+    }
+
+
+def _channel_detail(channel: str, obs: dict[str, Any]) -> str:
+    """One sentence of measured context for a channel, taken from the session itself."""
+    if channel in ("max_cell_v", "min_cell_v"):
+        return (
+            f"Cell voltages in this session run from {obs['lowest_cell_v']:.3f} V to "
+            f"{obs['highest_cell_v']:.3f} V, a gap of {obs['cell_voltage_spread_mv']:.0f} mV."
+        )
+    if channel in ("max_temp", "min_temp"):
+        return (
+            f"Temperatures run from {obs['min_temperature_c']:.0f} to "
+            f"{obs['max_temperature_c']:.0f} \u00b0C."
+        )
+    if channel == "SOC":
+        return (
+            f"State of charge goes from {obs['soc_start_percent']:.0f}% to "
+            f"{obs['soc_end_percent']:.0f}%."
+        )
+    if channel == "current":
+        return f"Average current is {obs['mean_current_a']:+.1f} A ({obs['state']})."
+    if channel == "voltage":
+        return f"Voltage runs from {obs['voltage_min_v']:.3f} V to {obs['voltage_max_v']:.3f} V."
+    return f"The session lasts {obs['session_minutes']:.0f} minutes."
+
+
+def build_reasons(
+    sensitivity: dict[str, float], obs: dict[str, Any], limit: int = MAX_REASONS
+) -> list[dict[str, Any]]:
+    """The sensor channels the fault score reacts to most, in plain language.
+
+    ``effect_points`` is how many percentage points the fault risk moves when
+    that channel is set to its training average. It describes the model's
+    behaviour on this session; it is not a cause.
+    """
+    ranked = sorted(sensitivity.items(), key=lambda item: item[1], reverse=True)
+    reasons = []
+    for channel, effect in ranked:
+        if effect < MIN_REASON_EFFECT or len(reasons) >= limit:
+            break
+        points = int(round(effect * 100))
+        reasons.append(
+            {
+                "channel": channel,
+                "label": CHANNEL_LABELS.get(channel, channel),
+                "effect_points": points,
+                "detail": (
+                    f"{_channel_detail(channel, obs)} Setting it to its training average "
+                    f"moves the fault risk by {points} points."
+                ),
+            }
+        )
+    return reasons
+
+
+def risk_level(fault_probability: float, alert_probability: float) -> str:
+    """``elevated`` at or above the display threshold, otherwise ``low``."""
+    return "elevated" if fault_probability >= alert_probability else "low"
+
+
+def context_note(level: str, true_label: int | None) -> str | None:
+    """Reminds the viewer when the score and the dataset's label disagree."""
+    if true_label == 1 and level == "low":
+        return (
+            "The dataset marks this car faulty, but this single session scores low. The label "
+            "describes the whole vehicle's history, so one session can look normal."
+        )
+    if true_label == 0 and level == "elevated":
+        return (
+            "The dataset marks this car healthy. The fault score is experimental and can be "
+            "wrong on a single session."
+        )
+    return None
+
+
+# --------------------------------------------------------------------------
 # torch-dependent part (lazy)
 # --------------------------------------------------------------------------
 
@@ -458,6 +580,42 @@ def explain(
         if include_attention:
             result["attention_weights"] = [round(w, 5) for w in weights]
     return result
+
+
+def explain_demo_session(session_id: str, alert_probability: float = 0.5) -> dict[str, Any]:
+    """Prediction plus a plain-language explanation for one recorded demo session.
+
+    Runs the model twice on the same session (``predict`` for capacity and
+    State of Health, ``explain`` for the per-sensor sensitivities) and adds
+    facts measured from the readings. Fault risk stays an experimental score.
+
+    :raises DemoSessionNotFound: unknown or malformed id.
+    :raises ModelUnavailable: the weights, config or demo file cannot be used.
+    """
+    session = load_demo_session(session_id)
+    readings, dataset = session["readings"], session["dataset"]
+    prediction = predict(readings, dataset=dataset)
+    explanation = explain(readings, dataset=dataset)
+    observed = observed_signals(readings)
+    level = risk_level(prediction["fault_probability"], alert_probability)
+
+    rows = explanation.get("top_attention_rows") or []
+    return {
+        **prediction,
+        "session_id": session["id"],
+        "title": session["title"],
+        "dataset": dataset,
+        "true_label": session["true_label"],
+        "risk_level": level,
+        "alert_probability": alert_probability,
+        "headline": "Elevated fault risk" if level == "elevated" else "Low fault risk",
+        "reasons": build_reasons(explanation["channel_sensitivity"], observed),
+        "channel_sensitivity": explanation["channel_sensitivity"],
+        "observed": observed,
+        "top_attention_rows": rows or None,
+        "top_attention_seconds": [float(readings[r][_T]) for r in rows] or None,
+        "context_note": context_note(level, session["true_label"]),
+    }
 
 
 def _read_demo_file(path: Path) -> dict[str, Any]:

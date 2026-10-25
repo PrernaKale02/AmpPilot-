@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # Battery health model files, resolved inside app/ml_models/. To deploy a
     # different trained model, drop its .pt and the exported config next to the
     # old ones and point these at them (no code change needed).
-    model_weights_file: str = "final_model_no_mfg.pt"
+    model_weights_file: str = "final_model.pt"
     model_config_file: str = "model_config.json"
 
     # Remaining useful life (RUL). The precomputed per-car table written by the
@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     # values are cut to the cap and flagged `capped`.
     rul_file: str = "rul_estimates.csv"
     rul_cap_km: float = 500_000.0
+
+    # Display band for the experimental fault score. At or above this value the
+    # app shows "elevated fault risk" and opens the explanation by default.
+    # It is a presentation choice, not a diagnosis threshold: the notebook's
+    # validation threshold (about 0.012) flags almost every session.
+    fault_alert_probability: float = 0.5
 
     @property
     def cors_allow_origins_list(self) -> list[str]:
