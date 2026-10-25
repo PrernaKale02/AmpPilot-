@@ -26,3 +26,5 @@ dist/
 
 app/ml_models/*.pt
 Backend/X.npy
+!app/ml_models/model_config.json
+!app/ml_models/sample_session.json

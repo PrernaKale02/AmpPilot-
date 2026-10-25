@@ -4,16 +4,23 @@ No business logic lives here. Routers own their endpoints, services own their
 I/O, and this module assembles them and maps domain errors onto HTTP.
 """
 
+import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import assistant, battery, charging, simulation
+from app.api.routes import battery, charging, simulation
 from app.core.config import get_settings
 from app.core.exceptions import (
     AmpPilotError,
+    DemoSessionNotFound,
+    ModelUnavailable,
+    RulNotFound,
     UpstreamError,
     UpstreamNotConfigured,
     UpstreamTimeout,
@@ -24,10 +31,24 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Warms the battery model in the background; the API serves while it loads."""
+    from app.services import battery_model  # noqa: PLC0415 - keeps import order simple
+
+    warm_up_task = asyncio.create_task(asyncio.to_thread(battery_model.warm_up))
+    try:
+        yield
+    finally:
+        warm_up_task.cancel()
+
+
 app = FastAPI(
     title="AmpPilot API",
     version="0.2.0",
     summary="Backend for the AmpPilot EV companion app.",
+    lifespan=lifespan,
 )
 
 # React Native on iOS/Android is not a browser and does not enforce CORS, so
@@ -48,11 +69,28 @@ if allowed_origins:
 app.include_router(charging.router)
 app.include_router(battery.router)
 app.include_router(simulation.router)
-app.include_router(assistant.router)
 
 #: Domain error -> (HTTP status, stable code, message safe to show a user).
 #: Ordered most-specific first; `UpstreamTimeout` subclasses `UpstreamError`.
 _ERROR_MAP: tuple[tuple[type[AmpPilotError], int, str, str], ...] = (
+    (
+        RulNotFound,
+        404,
+        "RUL_NOT_FOUND",
+        "No remaining-life estimate is available for that car.",
+    ),
+    (
+        DemoSessionNotFound,
+        404,
+        "DEMO_SESSION_NOT_FOUND",
+        "That demo session does not exist.",
+    ),
+    (
+        ModelUnavailable,
+        503,
+        "MODEL_UNAVAILABLE",
+        "The battery health model is not available on the server.",
+    ),
     (
         UpstreamNotConfigured,
         503,
@@ -72,6 +110,21 @@ _ERROR_MAP: tuple[tuple[type[AmpPilotError], int, str, str], ...] = (
         "The charging station provider could not be reached.",
     ),
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """422 with FastAPI's usual `detail` list, minus the echoed request input.
+
+    The default handler copies each offending value back into the body. A NaN
+    or infinite number cannot be encoded as JSON, so a bad payload would turn
+    into a 500 instead of a 422 (and large payloads would be echoed in full).
+    """
+    errors = [
+        {"loc": list(error["loc"]), "msg": error["msg"], "type": error["type"]}
+        for error in exc.errors()
+    ]
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 
 @app.exception_handler(AmpPilotError)

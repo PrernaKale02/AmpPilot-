@@ -1,6 +1,9 @@
 import { api } from "../../../services/api";
 import { batteryMock } from "../data/battery";
-import { getSimulationTelemetry } from "./simulationData";
+
+// The first prediction after the server starts can take a while (the model loads
+// on demand), so these calls get more time than the shared 10 s default.
+const MODEL_TIMEOUT_MS = 30000;
 
 /**
  * Fetches the current battery overview: score, status, key metrics, and a
@@ -11,34 +14,77 @@ import { getSimulationTelemetry } from "./simulationData";
  *
  * @returns {Promise<typeof batteryMock>}
  */
-export async function getBattery(session) {
-  const telemetry = getSimulationTelemetry(session);
-  if (!telemetry) return batteryMock;
+export async function getBattery() {
+  return batteryMock;
+}
 
-  return {
-    ...batteryMock,
-    subtitle: `Simulated ${telemetry.direction} · ${telemetry.voltageV} V · ${telemetry.currentA} A`,
-    metrics: {
-      ...batteryMock.metrics,
-      stateOfCharge: { value: telemetry.stateOfChargePercent, unit: "%" },
-      estimatedRange: {
-        value: Math.round((batteryMock.metrics.estimatedRange.value * telemetry.stateOfChargePercent) / 90),
-        unit: batteryMock.metrics.estimatedRange.unit,
-      },
-      temperature: { value: telemetry.temperatureC, unit: "°C" },
+/**
+ * Lists the demo sessions the backend can run through the model: a bundled
+ * sample plus any healthy/faulty cars exported from the training notebook.
+ *
+ * @returns {Promise<Array<{
+ *   id: string,
+ *   title: string,
+ *   description: string,
+ *   dataset: 1 | 2 | 3 | null,
+ *   true_label: 0 | 1 | null
+ * }>>}
+ */
+export async function getDemoSessions() {
+  const response = await api.get("/battery/demo-sessions", {
+    timeout: MODEL_TIMEOUT_MS,
+  });
+  return response.data;
+}
+
+/**
+ * Asks the backend model to predict one demo session. The app has no live
+ * telemetry source yet, so this is how the Battery screen shows real model
+ * output. The result describes the demo session, not the user's own battery.
+ * `true_label` is the dataset's label (0 healthy, 1 faulty), not a model output.
+ * `fault_probability` is an experimental risk score; the API gives no yes/no.
+ *
+ * @param {string} [sessionId="sample_session"] - Id from `getDemoSessions()`.
+ * @returns {Promise<{
+ *   capacity: number,
+ *   soh_percent: number,
+ *   fault_probability: number,
+ *   model_name: string,
+ *   normalisation: "global" | "per_dataset" | "approximate",
+ *   session_id: string,
+ *   title: string,
+ *   dataset: 1 | 2 | 3 | null,
+ *   true_label: 0 | 1 | null
+ * }>}
+ */
+export async function getDemoPrediction(sessionId = "sample_session") {
+  const response = await api.get(
+    `/battery/demo-sessions/${encodeURIComponent(sessionId)}`,
+    {
+      timeout: MODEL_TIMEOUT_MS,
     },
-  };
+  );
+  return response.data;
 }
 
 /**
  * Sends one real 128 x 8 charging-session reading sequence to the backend
- * battery model. This is intentionally not called by `getBattery()` because
- * the app has no live telemetry source yet.
+ * battery model. Not used by the Battery screen until the app has a live
+ * telemetry source.
  *
  * @param {number[][]} readings - 128 timesteps of the backend's eight sensor channels.
- * @returns {Promise<{capacity: number, soh_percent: number, fault_probability: number, is_faulty: boolean}>}
+ * @param {object} [options]
+ * @param {1|2|3} [options.dataset] - Training dataset (manufacturer) the session comes from; enables the exact training normalisation.
+ * @param {boolean} [options.includeAttention=false] - Also return the 128 attention weights.
+ * @returns {Promise<{capacity: number, soh_percent: number, fault_probability: number, model_name: string, normalisation: string, attention_weights?: number[], top_attention_rows?: number[]}>}
  */
-export async function predictBattery(readings) {
-  const response = await api.post("/battery/predict", { readings });
+export async function predictBattery(readings, options = {}) {
+  const { dataset, includeAttention = false } = options;
+  const body = { readings };
+  if (dataset) body.dataset = dataset;
+  if (includeAttention) body.include_attention = true;
+  const response = await api.post("/battery/predict", body, {
+    timeout: MODEL_TIMEOUT_MS,
+  });
   return response.data;
 }

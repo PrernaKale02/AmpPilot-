@@ -5,9 +5,13 @@ import { useNavigation } from "@react-navigation/native";
 import { Screen, AppHeader } from "../../../components/layout";
 import { Card } from "../../../components/ui/Card";
 import { Theme } from "../../../theme/theme";
-import { getBattery } from "../services/batteryService";
+import {
+  getBattery,
+  getDemoPrediction,
+  getDemoSessions,
+} from "../services/batteryService";
 import { BatteryMetricCard } from "../components/BatteryMetricCard";
-import { useSimulationStore } from "../../../store/simulationStore";
+import { ModelPredictionCard } from "../components/ModelPredictionCard";
 
 const METRIC_ICONS = {
   stateOfHealth: "pulse-outline",
@@ -36,17 +40,64 @@ const METRIC_LABELS = {
 export default function BatteryScreen() {
   const navigation = useNavigation();
   const [battery, setBattery] = useState(null);
-  const session = useSimulationStore((state) => state.session);
+  const [prediction, setPrediction] = useState(null);
+  const [demoSessions, setDemoSessions] = useState([]);
+  const [selectedSessionId, setSelectedSessionId] = useState(null);
+  const [predictionStatus, setPredictionStatus] = useState("loading");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
-    getBattery(session).then((data) => {
+    getBattery().then((data) => {
       if (isMounted) setBattery(data);
     });
     return () => {
       isMounted = false;
     };
-  }, [session]);
+  }, []);
+
+  // Independent of the overview above: a missing backend or model must not
+  // block the screen, it only turns the model card into an error message.
+  useEffect(() => {
+    let isMounted = true;
+    getDemoSessions()
+      .then((list) => {
+        if (!isMounted) return;
+        setDemoSessions(list);
+        if (list.length > 0)
+          setSelectedSessionId((current) => current ?? list[0].id);
+        else setPredictionStatus("error");
+      })
+      .catch(() => {
+        if (isMounted) setPredictionStatus("error");
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [reloadKey]);
+
+  useEffect(() => {
+    if (!selectedSessionId) return undefined;
+    let isMounted = true;
+    setPredictionStatus("loading");
+    getDemoPrediction(selectedSessionId)
+      .then((data) => {
+        if (!isMounted) return;
+        setPrediction(data);
+        setPredictionStatus("ready");
+      })
+      .catch(() => {
+        if (isMounted) setPredictionStatus("error");
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSessionId, reloadKey]);
+
+  const handleRetry = () => {
+    setPredictionStatus("loading");
+    setReloadKey((key) => key + 1);
+  };
 
   if (!battery) {
     return <Screen />;
@@ -79,23 +130,49 @@ export default function BatteryScreen() {
         ))}
       </View>
 
+      <ModelPredictionCard
+        status={predictionStatus}
+        prediction={prediction}
+        sessions={demoSessions}
+        selectedId={selectedSessionId}
+        onSelect={setSelectedSessionId}
+        onRetry={handleRetry}
+      />
+
       <Card style={styles.recommendationCard}>
         <View style={styles.recommendationHeader}>
-          <Ionicons name="bulb-outline" size={18} color={Theme.colors.primary} />
+          <Ionicons
+            name="bulb-outline"
+            size={18}
+            color={Theme.colors.primary}
+          />
           <Text style={styles.recommendationLabel}>Recommendation</Text>
         </View>
         <Text style={styles.recommendationBody}>{recommendation}</Text>
       </Card>
 
-      <Card style={styles.simulationCard} onPress={() => navigation.navigate("SimulationMode")}>
+      <Card
+        style={styles.simulationCard}
+        onPress={() => navigation.navigate("SimulationMode")}
+      >
         <View style={styles.simulationIcon}>
-          <Ionicons name="flask-outline" size={20} color={Theme.colors.primary} />
+          <Ionicons
+            name="flask-outline"
+            size={20}
+            color={Theme.colors.primary}
+          />
         </View>
         <View style={styles.simulationText}>
           <Text style={styles.simulationTitle}>Simulation Mode</Text>
-          <Text style={styles.simulationSubtitle}>Run a virtual EV session for local testing.</Text>
+          <Text style={styles.simulationSubtitle}>
+            Run a virtual EV session for local testing.
+          </Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={Theme.colors.textMuted} />
+        <Ionicons
+          name="chevron-forward"
+          size={18}
+          color={Theme.colors.textMuted}
+        />
       </Card>
     </Screen>
   );
