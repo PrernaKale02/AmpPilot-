@@ -24,10 +24,10 @@ export function getSimulatedChargingSession(session) {
     const previous = chargingReadings[index - 1];
     const current = chargingReadings[index];
     const elapsedSeconds = current.simulatedSeconds - previous.simulatedSeconds;
-    const averagePower = (
-      Math.abs(previous.voltageV * previous.currentA)
-      + Math.abs(current.voltageV * current.currentA)
-    ) / 2;
+    const averagePower =
+      (Math.abs(previous.voltageV * previous.currentA) +
+        Math.abs(current.voltageV * current.currentA)) /
+      2;
     energyKwh += (averagePower * elapsedSeconds) / 3_600_000;
   }
 
@@ -40,10 +40,28 @@ export function getSimulatedChargingSession(session) {
     endSoc: Math.round(lastReading.stateOfChargePercent),
     durationMinutes: Math.max(
       1,
-      Math.round((lastReading.simulatedSeconds - firstReading.simulatedSeconds) / 60)
+      Math.round(
+        (lastReading.simulatedSeconds - firstReading.simulatedSeconds) / 60,
+      ),
     ),
     energyAddedKwh: Math.round(energyKwh * 10) / 10,
     location: "Virtual EV",
     chargerType: "Simulated",
   };
+}
+
+/**
+ * Short, unambiguous label for a recorded demo car. Titles repeat ("Faulty car
+ * (dataset 1)" for two different cars), so the label is built from the id.
+ *
+ * @param {{id: string, title?: string}} demoSession
+ * @returns {string}
+ */
+export function demoSessionLabel(demoSession) {
+  const match = /^(faulty|healthy)_ds(\d)_([a-z])$/.exec(demoSession.id);
+  if (match) {
+    const kind = match[1] === "faulty" ? "Faulty" : "Healthy";
+    return `${kind} \u00b7 DS${match[2]} \u00b7 ${match[3].toUpperCase()}`;
+  }
+  return demoSession.title || demoSession.id;
 }

@@ -121,6 +121,51 @@ class ExplanationResult(BaseModel):
     )
 
 
+class ExplainReason(BaseModel):
+    """One sensor channel the fault score reacts to, with measured context."""
+
+    channel: str
+    label: str
+    effect_points: int = Field(
+        ..., description="Percentage points the fault risk moves when this channel is set to its training average."
+    )
+    detail: str
+
+
+class DemoExplanation(BaseModel):
+    """Prediction and plain-language explanation for one recorded demo session."""
+
+    session_id: str
+    title: str
+    dataset: Literal[1, 2, 3] | None = None
+    true_label: Literal[0, 1] | None = Field(
+        None, description="The dataset's label for the vehicle (0 healthy, 1 faulty), not a model output."
+    )
+    capacity: float
+    soh_percent: float
+    fault_probability: float
+    fault_probability_experimental: bool = True
+    model_name: str = ""
+    normalisation: Normalisation = "global"
+    risk_level: Literal["elevated", "low"]
+    alert_probability: float = Field(..., description="Display threshold used for `risk_level`.")
+    headline: str
+    reasons: list[ExplainReason]
+    channel_sensitivity: dict[str, float]
+    observed: dict[str, float | str] = Field(
+        ..., description="Facts measured directly from the session's readings."
+    )
+    top_attention_rows: list[int] | None = None
+    top_attention_seconds: list[float] | None = Field(
+        None, description="Session time (s) of the time steps the model attended to most."
+    )
+    context_note: str | None = None
+    note: str = (
+        "Shows how the model reacts on this one recorded session. It is not proof of why a "
+        "fault exists, and the fault score is experimental, not a diagnosis."
+    )
+
+
 class ModelInfo(BaseModel):
     """What model the server has, and whether it can run."""
 

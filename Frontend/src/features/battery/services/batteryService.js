@@ -6,6 +6,24 @@ import { batteryMock } from "../data/battery";
 const MODEL_TIMEOUT_MS = 30000;
 
 /**
+ * Throws unless the backend answered with the expected shape.
+ *
+ * When `EXPO_PUBLIC_API_URL` is missing or wrong, requests can land on the Expo
+ * web server, which answers every path with its own HTML page and status 200.
+ * Without this check that text would reach the screens and crash them.
+ *
+ * @param {boolean} isValid - Whether the response data has the expected shape.
+ * @returns {void}
+ */
+function assertBackendResponse(isValid) {
+  if (!isValid) {
+    throw new Error(
+      "Unexpected response from the backend. Check EXPO_PUBLIC_API_URL and that the backend is running.",
+    );
+  }
+}
+
+/**
  * Fetches the current battery overview: score, status, key metrics, and a
  * charging recommendation.
  *
@@ -34,6 +52,7 @@ export async function getDemoSessions() {
   const response = await api.get("/battery/demo-sessions", {
     timeout: MODEL_TIMEOUT_MS,
   });
+  assertBackendResponse(Array.isArray(response.data));
   return response.data;
 }
 
@@ -63,6 +82,43 @@ export async function getDemoPrediction(sessionId = "sample_session") {
     {
       timeout: MODEL_TIMEOUT_MS,
     },
+  );
+  assertBackendResponse(typeof response.data?.soh_percent === "number");
+  return response.data;
+}
+
+/**
+ * Prediction plus a plain-language explanation for one recorded demo session:
+ * the sensors the fault score reacts to most, and facts measured from the
+ * recording. `risk_level` is a display band over an experimental score, not a
+ * diagnosis. `true_label` is the dataset's label, not a model output.
+ *
+ * @param {string} sessionId - Id from `getDemoSessions()`.
+ * @returns {Promise<{
+ *   session_id: string,
+ *   title: string,
+ *   dataset: 1 | 2 | 3 | null,
+ *   true_label: 0 | 1 | null,
+ *   capacity: number,
+ *   soh_percent: number,
+ *   fault_probability: number,
+ *   risk_level: "elevated" | "low",
+ *   headline: string,
+ *   reasons: Array<{channel: string, label: string, effect_points: number, detail: string}>,
+ *   observed: Record<string, number | string>,
+ *   top_attention_seconds: number[] | null,
+ *   context_note: string | null,
+ *   note: string
+ * }>}
+ */
+export async function getDemoExplanation(sessionId) {
+  const response = await api.get(
+    `/battery/demo-sessions/${encodeURIComponent(sessionId)}/explain`,
+    { timeout: MODEL_TIMEOUT_MS },
+  );
+  assertBackendResponse(
+    typeof response.data?.soh_percent === "number" &&
+      Array.isArray(response.data?.reasons),
   );
   return response.data;
 }

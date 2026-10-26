@@ -32,14 +32,21 @@ export function LiveSimulationDashboard({ session }) {
   if (!telemetry) {
     return (
       <Card style={styles.emptyCard}>
-        <Ionicons name="pulse-outline" size={24} color={Theme.colors.textMuted} />
+        <Ionicons
+          name="pulse-outline"
+          size={24}
+          color={Theme.colors.textMuted}
+        />
         <Text style={styles.emptyTitle}>No simulated readings yet</Text>
-        <Text style={styles.emptyText}>Start a session to populate the live battery dashboard.</Text>
+        <Text style={styles.emptyText}>
+          Start a session to populate the live battery dashboard.
+        </Text>
       </Card>
     );
   }
 
-  const stateLabel = telemetry.batteryStatus[0].toUpperCase() + telemetry.batteryStatus.slice(1);
+  const stateLabel =
+    telemetry.batteryStatus[0].toUpperCase() + telemetry.batteryStatus.slice(1);
   const stateColor = statusColor(telemetry.batteryStatus);
   const isRunning = session.status === "running";
   const direction = directionFromCurrent(telemetry.currentA);
@@ -50,13 +57,26 @@ export function LiveSimulationDashboard({ session }) {
         <View style={styles.overviewTop}>
           <View>
             <Text style={styles.sectionLabel}>Live battery overview</Text>
-            <Text style={[styles.statusText, { color: stateColor }]}>{stateLabel}</Text>
+            <Text style={[styles.statusText, { color: stateColor }]}>
+              {stateLabel}
+            </Text>
           </View>
-          {isRunning ? <Text style={styles.activeBadge}>SIMULATION ACTIVE</Text> : null}
+          {isRunning ? (
+            <Text style={styles.activeBadge}>
+              {session.replay ? "REPLAY ACTIVE" : "SIMULATION ACTIVE"}
+            </Text>
+          ) : null}
         </View>
         <View style={styles.ringRow}>
           <Svg width={RING_SIZE} height={RING_SIZE} viewBox="0 0 132 132">
-            <Circle cx="66" cy="66" r={RING_RADIUS} stroke={Theme.colors.surfaceElevated} strokeWidth="12" fill="none" />
+            <Circle
+              cx="66"
+              cy="66"
+              r={RING_RADIUS}
+              stroke={Theme.colors.surfaceElevated}
+              strokeWidth="12"
+              fill="none"
+            />
             <AnimatedCircle
               cx="66"
               cy="66"
@@ -71,11 +91,19 @@ export function LiveSimulationDashboard({ session }) {
             />
           </Svg>
           <View style={styles.socLabel} pointerEvents="none">
-            <Text style={styles.socValue}>{telemetry.stateOfChargePercent.toFixed(0)}%</Text>
-            <Text style={styles.socCaption}>SIMULATED SOC</Text>
+            <Text style={styles.socValue}>
+              {telemetry.stateOfChargePercent.toFixed(0)}%
+            </Text>
+            <Text style={styles.socCaption}>
+              {session.replay ? "RECORDED SOC" : "SIMULATED SOC"}
+            </Text>
           </View>
           <View style={styles.directionBlock}>
-            <Ionicons name={directionIcon(direction)} size={22} color={Theme.colors.primary} />
+            <Ionicons
+              name={directionIcon(direction)}
+              size={22}
+              color={Theme.colors.primary}
+            />
             <Text style={styles.direction}>{direction}</Text>
             <Text style={styles.directionHint}>Virtual battery flow</Text>
           </View>
@@ -83,9 +111,21 @@ export function LiveSimulationDashboard({ session }) {
       </Card>
 
       <View style={styles.metrics}>
-        <Metric icon="flash-outline" label="Voltage" value={`${telemetry.voltageV} V`} />
-        <Metric icon="speedometer-outline" label="Current" value={formatCurrent(telemetry.currentA)} />
-        <Metric icon="thermometer-outline" label="Temperature" value={`${telemetry.temperatureC} °C`} />
+        <Metric
+          icon="flash-outline"
+          label={session.replay ? "Cell voltage" : "Voltage"}
+          value={`${telemetry.voltageV} V`}
+        />
+        <Metric
+          icon="speedometer-outline"
+          label="Current"
+          value={formatCurrent(telemetry.currentA)}
+        />
+        <Metric
+          icon="thermometer-outline"
+          label="Temperature"
+          value={`${telemetry.temperatureC} °C`}
+        />
       </View>
 
       <TelemetryChart
@@ -119,7 +159,12 @@ function Metric({ icon, label, value }) {
 
 function TelemetryChart({ title, unit, color, history = [], valueKey }) {
   if (history.length < 2) {
-    return <ChartCard title={title} message="Waiting for another simulated reading…" />;
+    return (
+      <ChartCard
+        title={title}
+        message="Waiting for another simulated reading…"
+      />
+    );
   }
   const values = history.map((entry) => entry[valueKey]);
   const min = Math.min(...values);
@@ -139,17 +184,35 @@ function TelemetryChart({ title, unit, color, history = [], valueKey }) {
     <Card style={styles.chartCard}>
       <View style={styles.chartHeader}>
         <Text style={styles.chartTitle}>{title}</Text>
-        <Text style={styles.chartValue}>{values[values.length - 1].toFixed(1)} {unit}</Text>
+        <Text style={styles.chartValue}>
+          {values[values.length - 1].toFixed(1)} {unit}
+        </Text>
       </View>
-      <Svg width="100%" height="126" viewBox={`0 0 ${width} 126`} preserveAspectRatio="none">
+      <Svg
+        width="100%"
+        height="126"
+        viewBox={`0 0 ${width} 126`}
+        preserveAspectRatio="none"
+      >
         <Line x1="0" y1="30" x2={width} y2="30" stroke={Theme.colors.divider} />
         <Line x1="0" y1="78" x2={width} y2="78" stroke={Theme.colors.divider} />
-        <Polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <Polyline
+          points={points}
+          fill="none"
+          stroke={color}
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </Svg>
       <View style={styles.chartAxis}>
-        <Text style={styles.axisLabel}>{formatSimulatedTime(history[0].simulatedSeconds)}</Text>
+        <Text style={styles.axisLabel}>
+          {formatSimulatedTime(history[0].simulatedSeconds)}
+        </Text>
         <Text style={styles.axisLabel}>Simulated time</Text>
-        <Text style={styles.axisLabel}>{formatSimulatedTime(history[history.length - 1].simulatedSeconds)}</Text>
+        <Text style={styles.axisLabel}>
+          {formatSimulatedTime(history[history.length - 1].simulatedSeconds)}
+        </Text>
       </View>
     </Card>
   );
@@ -168,16 +231,28 @@ function SimulationEvents({ events = [] }) {
   return (
     <View style={styles.events}>
       <Text style={styles.sectionLabel}>Simulated event timeline</Text>
-      {events.length === 0 ? <Text style={styles.emptyText}>No simulated session events yet.</Text> : null}
-      {events.slice(-8).reverse().map((event, index) => (
-        <Card key={`${event.timestamp}-${index}`} style={styles.eventCard}>
-          <View style={[styles.eventDot, { backgroundColor: eventColor(event.kind) }]} />
-          <View style={styles.eventText}>
-            <Text style={styles.eventMessage}>{event.message}</Text>
-            <Text style={styles.eventTime}>SIMULATED · {formatSimulatedTime(event.simulatedSeconds)}</Text>
-          </View>
-        </Card>
-      ))}
+      {events.length === 0 ? (
+        <Text style={styles.emptyText}>No simulated session events yet.</Text>
+      ) : null}
+      {events
+        .slice(-8)
+        .reverse()
+        .map((event, index) => (
+          <Card key={`${event.timestamp}-${index}`} style={styles.eventCard}>
+            <View
+              style={[
+                styles.eventDot,
+                { backgroundColor: eventColor(event.kind) },
+              ]}
+            />
+            <View style={styles.eventText}>
+              <Text style={styles.eventMessage}>{event.message}</Text>
+              <Text style={styles.eventTime}>
+                SIMULATED · {formatSimulatedTime(event.simulatedSeconds)}
+              </Text>
+            </View>
+          </Card>
+        ))}
     </View>
   );
 }
@@ -213,34 +288,107 @@ function formatCurrent(currentA) {
 const styles = StyleSheet.create({
   container: { gap: Theme.spacing.lg },
   overviewCard: { gap: Theme.spacing.md },
-  overviewTop: { flexDirection: "row", justifyContent: "space-between", gap: Theme.spacing.sm },
-  sectionLabel: { ...Theme.typography.overline, color: Theme.colors.textSecondary, textTransform: "uppercase" },
+  overviewTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: Theme.spacing.sm,
+  },
+  sectionLabel: {
+    ...Theme.typography.overline,
+    color: Theme.colors.textSecondary,
+    textTransform: "uppercase",
+  },
   statusText: { ...Theme.typography.h2, marginTop: 2 },
-  activeBadge: { ...Theme.typography.overline, color: Theme.colors.primary, borderWidth: 1, borderColor: Theme.colors.primary, borderRadius: Theme.radius.pill, paddingHorizontal: Theme.spacing.sm, paddingVertical: Theme.spacing.xs, alignSelf: "flex-start" },
-  ringRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: RING_SIZE },
-  socLabel: { position: "absolute", left: 26, width: 80, top: 43, alignItems: "center" },
+  activeBadge: {
+    ...Theme.typography.overline,
+    color: Theme.colors.primary,
+    borderWidth: 1,
+    borderColor: Theme.colors.primary,
+    borderRadius: Theme.radius.pill,
+    paddingHorizontal: Theme.spacing.sm,
+    paddingVertical: Theme.spacing.xs,
+    alignSelf: "flex-start",
+  },
+  ringRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: RING_SIZE,
+  },
+  socLabel: {
+    position: "absolute",
+    left: 26,
+    width: 80,
+    top: 43,
+    alignItems: "center",
+  },
   socValue: { ...Theme.typography.h2, color: Theme.colors.textPrimary },
-  socCaption: { ...Theme.typography.overline, color: Theme.colors.textMuted, fontSize: 9 },
+  socCaption: {
+    ...Theme.typography.overline,
+    color: Theme.colors.textMuted,
+    fontSize: 9,
+  },
   directionBlock: { alignItems: "flex-end", flex: 1, gap: 2 },
-  direction: { ...Theme.typography.body, color: Theme.colors.textPrimary, textTransform: "capitalize" },
-  directionHint: { ...Theme.typography.caption, color: Theme.colors.textSecondary, textAlign: "right" },
+  direction: {
+    ...Theme.typography.body,
+    color: Theme.colors.textPrimary,
+    textTransform: "capitalize",
+  },
+  directionHint: {
+    ...Theme.typography.caption,
+    color: Theme.colors.textSecondary,
+    textAlign: "right",
+  },
   metrics: { flexDirection: "row", gap: Theme.spacing.sm },
   metricCard: { flex: 1, padding: Theme.spacing.sm, gap: Theme.spacing.xs },
   metricLabel: { ...Theme.typography.overline, color: Theme.colors.textMuted },
-  metricValue: { ...Theme.typography.caption, color: Theme.colors.textPrimary, fontWeight: "600" },
+  metricValue: {
+    ...Theme.typography.caption,
+    color: Theme.colors.textPrimary,
+    fontWeight: "600",
+  },
   chartCard: { gap: Theme.spacing.sm },
-  chartHeader: { flexDirection: "row", justifyContent: "space-between", gap: Theme.spacing.md },
+  chartHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: Theme.spacing.md,
+  },
   chartTitle: { ...Theme.typography.h3, color: Theme.colors.textPrimary },
   chartValue: { ...Theme.typography.body, color: Theme.colors.textSecondary },
-  chartAxis: { flexDirection: "row", justifyContent: "space-between", gap: Theme.spacing.xs },
+  chartAxis: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: Theme.spacing.xs,
+  },
   axisLabel: { ...Theme.typography.overline, color: Theme.colors.textMuted },
   events: { gap: Theme.spacing.sm },
-  eventCard: { flexDirection: "row", alignItems: "flex-start", gap: Theme.spacing.sm, padding: Theme.spacing.sm },
-  eventDot: { width: 8, height: 8, borderRadius: Theme.radius.pill, marginTop: 6 },
+  eventCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Theme.spacing.sm,
+    padding: Theme.spacing.sm,
+  },
+  eventDot: {
+    width: 8,
+    height: 8,
+    borderRadius: Theme.radius.pill,
+    marginTop: 6,
+  },
   eventText: { flex: 1, gap: 2 },
-  eventMessage: { ...Theme.typography.caption, color: Theme.colors.textPrimary },
+  eventMessage: {
+    ...Theme.typography.caption,
+    color: Theme.colors.textPrimary,
+  },
   eventTime: { ...Theme.typography.overline, color: Theme.colors.textMuted },
-  emptyCard: { alignItems: "center", gap: Theme.spacing.sm, paddingVertical: Theme.spacing.xl },
+  emptyCard: {
+    alignItems: "center",
+    gap: Theme.spacing.sm,
+    paddingVertical: Theme.spacing.xl,
+  },
   emptyTitle: { ...Theme.typography.h3, color: Theme.colors.textPrimary },
-  emptyText: { ...Theme.typography.caption, color: Theme.colors.textSecondary, textAlign: "center" },
+  emptyText: {
+    ...Theme.typography.caption,
+    color: Theme.colors.textSecondary,
+    textAlign: "center",
+  },
 });

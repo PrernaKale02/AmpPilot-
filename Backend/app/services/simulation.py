@@ -5,12 +5,15 @@ from datetime import datetime, timezone
 from math import sin
 from time import monotonic
 
+import numpy as np
+
 from app.schemas.simulation import (
     SimulatedTelemetry,
     SimulationConfig,
     SimulationEvent,
     SimulationStatus,
 )
+from app.services import battery_model
 
 MAX_TELEMETRY_HISTORY = 120
 SIMULATION_CYCLE_SECONDS = 1_800
@@ -18,9 +21,44 @@ DISCHARGE_SECONDS = 900
 IDLE_SECONDS = 180
 IDLE_CURRENT_THRESHOLD_A = 0.5
 
+# Column order of a recorded session (the same 128 x 8 layout the model reads).
+_VOLTAGE, _CURRENT, _SOC, _MAX_TEMP, _TIME = 0, 1, 2, 5, 7
+# Used only if a recorded file has no usable time column.
+_FALLBACK_STEP_SECONDS = 10.0
+
 
 def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+@dataclass(frozen=True)
+class _Replay:
+    """A recorded charging session played back as simulated telemetry."""
+
+    session_id: str
+    title: str
+    seconds: np.ndarray  # strictly increasing, starts at 0
+    readings: np.ndarray  # (128, 8), raw sensor values
+
+    @property
+    def total_seconds(self) -> float:
+        return float(self.seconds[-1])
+
+
+def _load_replay(session_id: str) -> _Replay:
+    """Loads a demo session for playback.
+
+    :raises DemoSessionNotFound: unknown or malformed id.
+    :raises ModelUnavailable: the file exists but is not a valid session.
+    """
+    data = battery_model.load_demo_session(session_id)
+    readings = np.asarray(data["readings"], dtype=float)
+    seconds = readings[:, _TIME] - readings[0, _TIME]
+    if not np.all(np.diff(seconds) > 0):
+        seconds = np.arange(len(readings)) * _FALLBACK_STEP_SECONDS
+    return _Replay(
+        session_id=data["id"], title=data["title"], seconds=seconds, readings=readings
+    )
 
 
 @dataclass
@@ -37,6 +75,8 @@ class _Session:
     events: list[SimulationEvent] = field(default_factory=list)
     next_telemetry_real_seconds: float = 0
     battery_status: str = "normal"
+    replay: _Replay | None = None
+
 
 class SimulationService:
     """Owns one local session; elapsed time is derived from a monotonic clock.
@@ -51,6 +91,8 @@ class SimulationService:
         self._last_stopped_at: str | None = None
 
     def start(self, config: SimulationConfig) -> SimulationStatus:
+        # Load first: an unknown demo id must not destroy the session that is running.
+        replay = _load_replay(config.demo_session_id) if config.demo_session_id else None
         now = monotonic()
         # Replacing the single session makes a second start deterministic and
         # avoids leaving a second local scheduler/session behind.
@@ -60,8 +102,14 @@ class SimulationService:
             active_started_at=now,
             elapsed_active_seconds=0,
             started_at=_timestamp(),
+            replay=replay,
         )
-        self._add_event(self._session, "session", "Simulation session started.", 0)
+        message = (
+            f"Replaying recorded charging session: {replay.title}."
+            if replay
+            else "Simulation session started."
+        )
+        self._add_event(self._session, "session", message, 0)
         self._last_stopped_at = None
         return self.status()
 
@@ -93,12 +141,12 @@ class SimulationService:
             return SimulationStatus(status="idle", stopped_at=self._last_stopped_at)
 
         elapsed = self._elapsed_real(session)
-        duration_seconds = session.config.duration_minutes * 60
+        duration_seconds = self._duration_seconds(session)
         if session.status == "running" and elapsed >= duration_seconds:
-            session.elapsed_active_seconds = float(duration_seconds)
+            session.elapsed_active_seconds = duration_seconds
             session.status = "completed"
             session.stopped_at = _timestamp()
-            elapsed = float(duration_seconds)
+            elapsed = duration_seconds
 
         self._record_telemetry(session, elapsed)
         if session.status == "completed" and not any(
@@ -106,7 +154,7 @@ class SimulationService:
         ):
             self._add_event(session, "session", "Simulation session completed.", elapsed)
 
-        elapsed = min(elapsed, float(duration_seconds))
+        elapsed = min(elapsed, duration_seconds)
         return SimulationStatus(
             status=session.status,
             config=session.config,
@@ -117,10 +165,21 @@ class SimulationService:
             paused_at=session.paused_at,
             resumed_at=session.resumed_at,
             stopped_at=session.stopped_at,
+            data_source="recorded" if session.replay else "generated",
+            replay_total_seconds=session.replay.total_seconds if session.replay else None,
             latest_telemetry=session.telemetry_history[-1] if session.telemetry_history else None,
             telemetry_history=session.telemetry_history,
             events=session.events,
         )
+
+    @staticmethod
+    def _duration_seconds(session: _Session) -> float:
+        """Real seconds the session runs: the configured duration, or less when
+        a recorded session ends sooner (it stops when the recording ends)."""
+        configured = float(session.config.duration_minutes * 60)
+        if session.replay is None:
+            return configured
+        return min(configured, session.replay.total_seconds / session.config.speed_multiplier)
 
     @staticmethod
     def _elapsed_real(session: _Session) -> float:
@@ -140,7 +199,10 @@ class SimulationService:
             simulated_seconds = (
                 session.next_telemetry_real_seconds * session.config.speed_multiplier
             )
-            telemetry = self._telemetry_at(session.config, simulated_seconds)
+            if session.replay is not None:
+                telemetry = self._replay_telemetry(session.config, session.replay, simulated_seconds)
+            else:
+                telemetry = self._telemetry_at(session.config, simulated_seconds)
             session.telemetry_history.append(telemetry)
             if len(session.telemetry_history) > MAX_TELEMETRY_HISTORY:
                 session.telemetry_history.pop(0)
@@ -181,17 +243,7 @@ class SimulationService:
         voltage = min(450.0, max(300.0, 345 + state_of_charge * 0.65 - current * 0.03))
         if abs(current) <= IDLE_CURRENT_THRESHOLD_A:
             direction = "idle"
-        battery_status = "normal"
-        if (
-            temperature >= config.critical_temperature_c
-            or state_of_charge <= config.critical_soc_percent
-        ):
-            battery_status = "critical"
-        elif (
-            temperature >= config.warning_temperature_c
-            or state_of_charge <= config.warning_soc_percent
-        ):
-            battery_status = "warning"
+        battery_status = SimulationService._classify(config, temperature, state_of_charge)
         return SimulatedTelemetry(
             simulated_seconds=round(simulated_seconds, 1),
             state_of_charge_percent=round(state_of_charge, 1),
@@ -200,6 +252,53 @@ class SimulationService:
             temperature_c=round(temperature, 1),
             direction=direction,
             battery_status=battery_status,
+        )
+
+    @staticmethod
+    def _classify(config: SimulationConfig, temperature: float, state_of_charge: float) -> str:
+        """Maps a reading onto normal / warning / critical using the config thresholds."""
+        if (
+            temperature >= config.critical_temperature_c
+            or state_of_charge <= config.critical_soc_percent
+        ):
+            return "critical"
+        if (
+            temperature >= config.warning_temperature_c
+            or state_of_charge <= config.warning_soc_percent
+        ):
+            return "warning"
+        return "normal"
+
+    @staticmethod
+    def _replay_telemetry(
+        config: SimulationConfig, replay: _Replay, simulated_seconds: float
+    ) -> SimulatedTelemetry:
+        """One reading from a recorded session, interpolated at ``simulated_seconds``.
+
+        Real dataset values: nothing is invented. Negative current is charging
+        (the dataset's convention), so direction follows the current's sign.
+        After the recording ends the last reading is held.
+        """
+        t = min(max(simulated_seconds, 0.0), replay.total_seconds)
+
+        def at(channel: int) -> float:
+            return float(np.interp(t, replay.seconds, replay.readings[:, channel]))
+
+        current = at(_CURRENT)
+        state_of_charge = min(100.0, max(0.0, at(_SOC)))
+        temperature = at(_MAX_TEMP)
+        if abs(current) <= IDLE_CURRENT_THRESHOLD_A:
+            direction = "idle"
+        else:
+            direction = "charging" if current < 0 else "discharging"
+        return SimulatedTelemetry(
+            simulated_seconds=round(t, 1),
+            state_of_charge_percent=round(state_of_charge, 1),
+            voltage_v=round(at(_VOLTAGE), 3),
+            current_a=round(current, 1),
+            temperature_c=round(temperature, 1),
+            direction=direction,
+            battery_status=SimulationService._classify(config, temperature, state_of_charge),
         )
 
     def _record_threshold_event(self, session: _Session, telemetry: SimulatedTelemetry) -> None:
