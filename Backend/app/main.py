@@ -14,7 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import battery, charging, simulation
+from app.api.routes import assistant, battery, charging, simulation
 from app.core.config import get_settings
 from app.core.exceptions import (
     AmpPilotError,
@@ -69,6 +69,7 @@ if allowed_origins:
 app.include_router(charging.router)
 app.include_router(battery.router)
 app.include_router(simulation.router)
+app.include_router(assistant.router)
 
 #: Domain error -> (HTTP status, stable code, message safe to show a user).
 #: Ordered most-specific first; `UpstreamTimeout` subclasses `UpstreamError`.
@@ -124,6 +125,11 @@ async def handle_validation_error(request: Request, exc: RequestValidationError)
         {"loc": list(error["loc"]), "msg": error["msg"], "type": error["type"]}
         for error in exc.errors()
     ]
+    if request.url.path.startswith("/api/assistant"):
+        logger.warning(
+            "AI voice assistant request validation failed",
+            extra={"assistant_stage": "request_validation", "path": request.url.path},
+        )
     return JSONResponse(status_code=422, content={"detail": errors})
 
 

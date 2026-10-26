@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     open_charge_map_api_key: str | None = None
     open_charge_map_timeout_seconds: float = 6.0
     open_charge_map_max_results: int = 50
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-3.5-flash-lite"
+    gemini_fallback_models: str = "gemini-3.8-flash,gemini-3.7-flash"
 
     # Kept as a raw string rather than `list[str]`: pydantic-settings parses
     # complex field types out of the environment with `json.loads`, so a plain

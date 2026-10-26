@@ -21,6 +21,8 @@ export async function askAssistantByVoice({ uri, latitude, longitude }) {
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`Voice request failed: ${response.status}`);
+  if (!response.ok) {
+    throw new Error(`Voice request failed: HTTP ${response.status}`);
+  }
   return response.json(); // { transcript, reply, action }
 }

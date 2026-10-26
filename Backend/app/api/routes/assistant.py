@@ -44,7 +44,10 @@ async def ask(request: AssistantRequest) -> AssistantResponse:
     try:
         reply, action = await ask_assistant(request.message, request.latitude, request.longitude)
     except Exception as exc:
-        logger.exception("Assistant request failed")
+        logger.exception(
+            "AI voice assistant request failed",
+            extra={"assistant_stage": "answer", "endpoint": "/api/assistant"},
+        )
         raise HTTPException(status_code=502, detail="The assistant is unavailable right now.") from exc
     return AssistantResponse(reply=reply, action=action)
 
@@ -59,10 +62,30 @@ async def ask_by_voice(
     latitude: float | None = Form(None),
     longitude: float | None = Form(None),
 ) -> VoiceAssistantResponse:
-    data = await audio.read()
+    try:
+        data = await audio.read()
+    except Exception as exc:
+        logger.exception(
+            "AI voice assistant could not read the uploaded recording",
+            extra={"assistant_stage": "audio_read", "endpoint": "/api/assistant/voice"},
+        )
+        raise HTTPException(status_code=400, detail="The recording could not be read.") from exc
     if not data:
+        logger.warning(
+            "AI voice assistant received an empty recording",
+            extra={"assistant_stage": "audio_validation", "endpoint": "/api/assistant/voice"},
+        )
         raise HTTPException(status_code=400, detail="The recording is empty.")
     if len(data) > MAX_AUDIO_BYTES:
+        logger.warning(
+            "AI voice assistant recording exceeded the size limit",
+            extra={
+                "assistant_stage": "audio_validation",
+                "endpoint": "/api/assistant/voice",
+                "size_bytes": len(data),
+                "size_limit_bytes": MAX_AUDIO_BYTES,
+            },
+        )
         raise HTTPException(status_code=413, detail="The recording is too long.")
 
     extension = Path(audio.filename or "").suffix.lower()
@@ -71,12 +94,28 @@ async def ask_by_voice(
 
     try:
         transcript = await transcribe_audio(data, mime_type)
-        if not transcript:
-            return VoiceAssistantResponse(
-                transcript="", reply="Sorry, I didn't catch that. Please try again.", action=None
-            )
+    except Exception as exc:
+        logger.exception(
+            "AI voice assistant transcription failed",
+            extra={"assistant_stage": "transcription", "endpoint": "/api/assistant/voice"},
+        )
+        raise HTTPException(status_code=502, detail="The assistant is unavailable right now.") from exc
+
+    if not transcript:
+        logger.warning(
+            "AI voice assistant could not detect speech in the recording",
+            extra={"assistant_stage": "transcription", "endpoint": "/api/assistant/voice"},
+        )
+        return VoiceAssistantResponse(
+            transcript="", reply="Sorry, I didn't catch that. Please try again.", action=None
+        )
+
+    try:
         reply, action = await ask_assistant(transcript, latitude, longitude)
     except Exception as exc:
-        logger.exception("Voice assistant request failed")
+        logger.exception(
+            "AI voice assistant answer generation failed",
+            extra={"assistant_stage": "answer", "endpoint": "/api/assistant/voice"},
+        )
         raise HTTPException(status_code=502, detail="The assistant is unavailable right now.") from exc
     return VoiceAssistantResponse(transcript=transcript, reply=reply, action=action)

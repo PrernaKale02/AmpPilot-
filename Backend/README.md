@@ -58,6 +58,15 @@ Liveness probe. Calls no external service and needs no API key.
 { "status": "ok" }
 ```
 
+### AI voice assistant
+
+`POST /api/assistant` accepts a text question; `POST /api/assistant/voice`
+accepts a recorded question. Assistant failures are logged with an
+`assistant_stage` field for request validation, audio validation/reading,
+transcription, or answer generation. Logs do not include the question,
+transcript, or recording. In the frontend console, related errors use the
+`[AI Voice Assistant]` prefix.
+
 ### `GET /api/charging-stations`
 
 | Param       | Type  | Required | Default | Validation |

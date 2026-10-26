@@ -6,6 +6,7 @@ import * as Speech from "expo-speech";
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } from "expo-audio";
 import { Theme } from "../../../theme/theme";
 import { askAssistant, askAssistantByVoice } from "../services/assistantService";
+import { logAssistantError, logAssistantWarning } from "../services/assistantLogger";
 
 const MAX_RECORDING_MS = 10000; // auto-stop long recordings
 
@@ -19,17 +20,37 @@ function createRecognizer() {
 async function getLocation() {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") return {};
+    if (status !== "granted") {
+      logAssistantWarning("location_permission_denied");
+      return {};
+    }
     const position = await Location.getCurrentPositionAsync({});
     return { latitude: position.coords.latitude, longitude: position.coords.longitude };
-  } catch {
+  } catch (error) {
+    logAssistantError("location_lookup", error, { fallback: "continue_without_location" });
     return {};
   }
 }
 
+function stopSpeech() {
+  try {
+    Promise.resolve(Speech.stop()).catch((error) => logAssistantError("speech_stop", error));
+  } catch (error) {
+    logAssistantError("speech_stop", error);
+  }
+}
+
 function say(text) {
-  Speech.stop();
-  Speech.speak(text, { language: "en-IN", rate: 0.95 });
+  stopSpeech();
+  try {
+    Speech.speak(text, {
+      language: "en-IN",
+      rate: 0.95,
+      onError: (error) => logAssistantError("speech_playback", error),
+    });
+  } catch (error) {
+    logAssistantError("speech_playback", error);
+  }
 }
 
 /**
@@ -55,7 +76,8 @@ export function AssistantButton({ navigation }) {
     }
   };
 
-  const handleFailure = () => {
+  const handleFailure = (stage, error) => {
+    logAssistantError(stage, error, { platform: Platform.OS });
     const message = "Sorry, the assistant is unavailable right now.";
     setReply(message);
     say(message);
@@ -71,8 +93,8 @@ export function AssistantButton({ navigation }) {
     try {
       const location = await getLocation();
       handleResult(await askAssistant({ message: text, ...location }));
-    } catch {
-      handleFailure();
+    } catch (error) {
+      handleFailure("question_processing", error);
     } finally {
       setState("idle");
     }
@@ -80,19 +102,25 @@ export function AssistantButton({ navigation }) {
 
   // ---- Phone app: record, then send the audio ----
   const startRecording = async () => {
-    const { granted } = await AudioModule.requestRecordingPermissionsAsync();
-    if (!granted) {
-      setReply("Microphone permission is needed to ask by voice. You can type your question below.");
-      return;
+    try {
+      const { granted } = await AudioModule.requestRecordingPermissionsAsync();
+      if (!granted) {
+        logAssistantWarning("microphone_permission_denied", { platform: Platform.OS });
+        setReply("Microphone permission is needed to ask by voice. You can type your question below.");
+        return;
+      }
+      stopSpeech();
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setHeard("");
+      setReply("");
+      setState("listening");
+      stopTimerRef.current = setTimeout(() => stopRecording(), MAX_RECORDING_MS);
+    } catch (error) {
+      handleFailure("recording_start", error);
+      setState("idle");
     }
-    Speech.stop();
-    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
-    await recorder.prepareToRecordAsync();
-    recorder.record();
-    setHeard("");
-    setReply("");
-    setState("listening");
-    stopTimerRef.current = setTimeout(() => stopRecording(), MAX_RECORDING_MS);
   };
 
   const stopRecording = async () => {
@@ -108,8 +136,8 @@ export function AssistantButton({ navigation }) {
       const result = await askAssistantByVoice({ uri, ...location });
       setHeard(result.transcript || "(didn't catch that)");
       handleResult(result);
-    } catch {
-      handleFailure();
+    } catch (error) {
+      handleFailure("recording_submit", error);
     } finally {
       setState("idle");
     }
@@ -117,30 +145,56 @@ export function AssistantButton({ navigation }) {
 
   // ---- Web: browser speech recognition ----
   const startWebListening = () => {
-    const recognizer = createRecognizer();
-    if (!recognizer) {
-      setReply("Voice input isn't supported in this browser. Please use Chrome or Safari, or type below.");
-      return;
+    try {
+      const recognizer = createRecognizer();
+      if (!recognizer) {
+        logAssistantWarning("speech_recognition_unsupported", { platform: Platform.OS });
+        setReply("Voice input isn't supported in this browser. Please use Chrome or Safari, or type below.");
+        return;
+      }
+      recognizerRef.current = recognizer;
+      recognizer.lang = "en-IN";
+      recognizer.interimResults = false;
+      recognizer.maxAlternatives = 1;
+      recognizer.onresult = (event) => {
+        const transcript = event.results?.[0]?.[0]?.transcript;
+        if (!transcript) {
+          logAssistantWarning("speech_recognition_empty_result");
+          setState("idle");
+          return;
+        }
+        ask(transcript);
+      };
+      recognizer.onerror = (event) => {
+        logAssistantError("speech_recognition", event.error || event.message || "Recognition failed", {
+          code: event.error,
+        });
+        setState("idle");
+      };
+      recognizer.onend = () => setState((current) => (current === "listening" ? "idle" : current));
+      stopSpeech();
+      setHeard("");
+      setReply("");
+      setState("listening");
+      recognizer.start();
+    } catch (error) {
+      handleFailure("speech_recognition_start", error);
+      setState("idle");
     }
-    recognizerRef.current = recognizer;
-    recognizer.lang = "en-IN";
-    recognizer.interimResults = false;
-    recognizer.maxAlternatives = 1;
-    recognizer.onresult = (event) => ask(event.results[0][0].transcript);
-    recognizer.onerror = () => setState("idle");
-    recognizer.onend = () => setState((current) => (current === "listening" ? "idle" : current));
-    Speech.stop();
-    setHeard("");
-    setReply("");
-    setState("listening");
-    recognizer.start();
   };
 
   const onMicPress = () => {
     setOpen(true);
     if (state === "thinking") return;
     if (Platform.OS === "web") {
-      if (state === "listening") recognizerRef.current?.stop();
+      if (state === "listening") {
+        try {
+          recognizerRef.current?.stop();
+        } catch (error) {
+          handleFailure("speech_recognition_stop", error);
+          setState("idle");
+        }
+      }
       else startWebListening();
       return;
     }
