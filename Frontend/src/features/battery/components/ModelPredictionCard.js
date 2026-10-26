@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Card } from "../../../components/ui/Card";
 import { Theme } from "../../../theme/theme";
+import { formatNumber, formatPercent } from "../utils/formatNumber";
 
 const LABEL_TEXT = { 0: "Healthy", 1: "Faulty" };
 
@@ -68,7 +69,7 @@ export function ModelPredictionCard({
 
       {sessions.length > 1 ? (
         <View style={styles.chips}>
-          {sessions.map((session) => {
+          {sessions.filter(Boolean).map((session) => {
             const selected = session.id === selectedId;
             return (
               <Pressable
@@ -114,13 +115,13 @@ export function ModelPredictionCard({
           <View style={styles.stats}>
             <Stat
               label="State of Health"
-              value={prediction.soh_percent.toFixed(1)}
+              value={formatNumber(prediction.soh_percent)}
               unit="%"
             />
-            <Stat label="Capacity" value={prediction.capacity.toFixed(1)} />
+            <Stat label="Capacity" value={formatNumber(prediction.capacity)} />
             <Stat
               label="Fault risk (experimental)"
-              value={Math.round(prediction.fault_probability * 100)}
+              value={formatPercent(prediction.fault_probability)}
               unit="%"
             />
           </View>

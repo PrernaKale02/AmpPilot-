@@ -7,11 +7,6 @@ import { getDemoExplanation } from "../services/batteryService";
 
 const LABEL_TEXT = { 0: "Healthy", 1: "Faulty" };
 
-function formatSeconds(seconds) {
-  const total = Math.max(0, Math.round(seconds || 0));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}
-
 /**
  * Health-model result for the recorded car that Simulation Mode is replaying,
  * with a "why" explanation. When the experimental fault score is elevated the
@@ -164,16 +159,6 @@ export function SimulationHealthCard({ session }) {
                   </View>
                 ))
               )}
-              {data.top_attention_seconds?.length ? (
-                <Text style={styles.caption}>
-                  The model paid most attention at{" "}
-                  {data.top_attention_seconds
-                    .slice(0, 3)
-                    .map(formatSeconds)
-                    .join(", ")}{" "}
-                  into the session.
-                </Text>
-              ) : null}
               <Text style={styles.footer}>{data.note}</Text>
             </View>
           ) : null}

@@ -6,6 +6,24 @@ import { batteryMock } from "../data/battery";
 const MODEL_TIMEOUT_MS = 30000;
 
 /**
+ * Throws unless the backend answered with the expected shape.
+ *
+ * When `EXPO_PUBLIC_API_URL` is missing or wrong, requests can land on the Expo
+ * web server, which answers every path with its own HTML page and status 200.
+ * Without this check that text would reach the screens and crash them.
+ *
+ * @param {boolean} isValid - Whether the response data has the expected shape.
+ * @returns {void}
+ */
+function assertBackendResponse(isValid) {
+  if (!isValid) {
+    throw new Error(
+      "Unexpected response from the backend. Check EXPO_PUBLIC_API_URL and that the backend is running.",
+    );
+  }
+}
+
+/**
  * Fetches the current battery overview: score, status, key metrics, and a
  * charging recommendation.
  *
@@ -34,6 +52,7 @@ export async function getDemoSessions() {
   const response = await api.get("/battery/demo-sessions", {
     timeout: MODEL_TIMEOUT_MS,
   });
+  assertBackendResponse(Array.isArray(response.data));
   return response.data;
 }
 
@@ -64,6 +83,7 @@ export async function getDemoPrediction(sessionId = "sample_session") {
       timeout: MODEL_TIMEOUT_MS,
     },
   );
+  assertBackendResponse(typeof response.data?.soh_percent === "number");
   return response.data;
 }
 
@@ -95,6 +115,10 @@ export async function getDemoExplanation(sessionId) {
   const response = await api.get(
     `/battery/demo-sessions/${encodeURIComponent(sessionId)}/explain`,
     { timeout: MODEL_TIMEOUT_MS },
+  );
+  assertBackendResponse(
+    typeof response.data?.soh_percent === "number" &&
+      Array.isArray(response.data?.reasons),
   );
   return response.data;
 }

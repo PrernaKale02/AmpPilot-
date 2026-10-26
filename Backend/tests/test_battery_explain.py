@@ -170,3 +170,10 @@ def test_route_without_a_model_is_503(demo_dir, monkeypatch):
     monkeypatch.setattr(bm, "predict", unavailable)
     response = client.get("/battery/demo-sessions/faulty_ds1_a/explain")
     assert response.status_code == 503
+
+
+def test_demo_prediction_names_its_real_source(demo_dir, monkeypatch):
+    _session(demo_dir, "faulty_3_515", title="Faulty car 3_515", dataset=3, true_label=1)
+    _fake_model(monkeypatch, 0.99, SENSITIVITY)
+    body = client.get("/battery/demo-sessions/faulty_3_515").json()
+    assert body["source"] == "recorded demo session"

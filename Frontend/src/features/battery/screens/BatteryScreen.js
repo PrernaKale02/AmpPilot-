@@ -12,6 +12,7 @@ import {
 } from "../services/batteryService";
 import { BatteryMetricCard } from "../components/BatteryMetricCard";
 import { ModelPredictionCard } from "../components/ModelPredictionCard";
+import { ErrorBoundary } from "../../../components/ErrorBoundary";
 
 const METRIC_ICONS = {
   stateOfHealth: "pulse-outline",
@@ -61,8 +62,12 @@ export default function BatteryScreen() {
   useEffect(() => {
     let isMounted = true;
     getDemoSessions()
-      .then((list) => {
+      .then((response) => {
         if (!isMounted) return;
+        // Ignore anything that is not a session object: one bad entry must not crash the screen.
+        const list = Array.isArray(response)
+          ? response.filter((item) => item && typeof item.id === "string")
+          : [];
         setDemoSessions(list);
         if (list.length > 0)
           setSelectedSessionId((current) => current ?? list[0].id);
@@ -130,14 +135,16 @@ export default function BatteryScreen() {
         ))}
       </View>
 
-      <ModelPredictionCard
-        status={predictionStatus}
-        prediction={prediction}
-        sessions={demoSessions}
-        selectedId={selectedSessionId}
-        onSelect={setSelectedSessionId}
-        onRetry={handleRetry}
-      />
+      <ErrorBoundary label="Health model">
+        <ModelPredictionCard
+          status={predictionStatus}
+          prediction={prediction}
+          sessions={demoSessions}
+          selectedId={selectedSessionId}
+          onSelect={setSelectedSessionId}
+          onRetry={handleRetry}
+        />
+      </ErrorBoundary>
 
       <Card style={styles.recommendationCard}>
         <View style={styles.recommendationHeader}>

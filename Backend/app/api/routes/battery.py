@@ -59,8 +59,14 @@ async def get_model_info() -> ModelInfo:
 def _predict_demo(session_id: str) -> BatteryDemoPrediction:
     session = battery_model.load_demo_session(session_id)
     result = battery_model.predict(session["readings"], dataset=session["dataset"])
+    source = (
+        "bundled sample charging session"
+        if session["id"] == battery_model.SAMPLE_SESSION_ID
+        else "recorded demo session"
+    )
     return BatteryDemoPrediction(
         **result,
+        source=source,
         session_id=session["id"],
         title=session["title"],
         dataset=session["dataset"],
